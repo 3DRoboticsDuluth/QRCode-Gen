@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FTC QR Generator (Blockly + PWA)</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Blockly -->
+  <script src="https://cdn.jsdelivr.net/npm/blockly@8.0.0/blockly.min.js"></script>
+
+  <!-- Libraries: pako (deflate), qrcode-generator, localforage -->
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/qrcode.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>FTC QR Generator</h1>
+    <p>Drag blocks to build an autonomous sequence. Generate a compressed QR for Limelight scanning. Cached locally for offline use.</p>
+  </header>
+
+  <main>
+    <section id="left">
+      <div id="toolbox" style="display:none">
+        <!-- Toolbox XML is injected by app.js -->
+      </div>
+
+      <div id="blocklyArea">
+        <div id="blocklyDiv" style="height:480px; width:100%;"></div>
+      </div>
+
+      <div class="controls">
+        <button id="genQR">Generate QR</button>
+        <button id="savePayload">Save Payload</button>
+        <button id="loadPayload">Load Last</button>
+        <button id="downloadPNG">Download QR PNG</button>
+        <span id="status"></span>
+      </div>
+
+      <label>Generated JSON (human-readable):</label>
+      <textarea id="jsonPreview" readonly></textarea>
+    </section>
+
+    <section id="right">
+      <div id="qrWrap">
+        <h3>QR Preview</h3>
+        <div id="qr"></div>
+      </div>
+
+      <label>Compressed (base64)</label>
+      <textarea id="payload" readonly></textarea>
+
+      <div id="savedListWrap">
+        <h4>Saved Payloads</h4>
+        <ul id="savedList"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>QR format: base64(zlib(deflate(JSON array))). Robot must base64-decode and inflate, then parse JSON.</small>
+  </footer>
+
+  <script src="blocks_custom.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
