@@ -1,108 +1,119 @@
+// ============================
 // blocks_custom.js
-// Defines custom Blockly blocks and a JS generator that returns a JSON array representation.
+// Custom Blockly blocks for FTC QR Generator
+// ============================
 
-// Toolbox XML (we'll insert this into the workspace on init)
-const TOOLBOX_XML = `
-<xml id="toolbox" style="display:none">
-  <category name="Robot" colour="#5C81A6">
-    <block type="intake_block"></block>
-    <block type="deposit_block"></block>
-    <block type="delay_block"></block>
-  </category>
-  <sep></sep>
-  <category name="Control" colour="#5CA65C">
-    <block type="controls_if"></block>
-    <block type="controls_repeat_ext"></block>
-  </category>
-  <category name="Math" colour="#5C68A6">
-    <block type="math_number"></block>
-    <block type="math_arithmetic"></block>
-  </category>
-  <category name="Text" colour="#5CA6A6">
-    <block type="text"></block>
-  </category>
-</xml>`;
-
-// Define blocks
 Blockly.defineBlocksWithJsonArray([
+  // --- When Run Block (Program start) ---
   {
-    "type": "intake_block",
-    "message0": "intake row %1",
-    "args0": [{"type":"field_number","name":"ROW","value":1,"min":1,"precision":1}],
-    "previousStatement": null,
+    "type": "when_run",
+    "message0": "When Run ▶",
     "nextStatement": null,
-    "colour": 230,
-    "tooltip": "Intake action for specified row",
+    "colour": 0,
+    "tooltip": "This block marks the start of the program",
     "helpUrl": ""
   },
+
+  // --- Intake Block ---
   {
-    "type": "deposit_block",
-    "message0": "deposit at x %1 y %2 heading %3",
+    "type": "intake_block",
+    "message0": "Intake row %1",
     "args0": [
-      {"type":"field_number","name":"X","value":0,"precision":0.01},
-      {"type":"field_number","name":"Y","value":0,"precision":0.01},
-      {"type":"field_number","name":"HEADING","value":0,"precision":0.1}
+      { "type": "field_number", "name": "ROW", "value": 1, "min": 1, "max": 3 }
     ],
     "previousStatement": null,
     "nextStatement": null,
-    "colour": 120,
-    "tooltip": "Deposit at pose",
+    "colour": 160,
+    "tooltip": "Run intake for a specific row",
     "helpUrl": ""
   },
+
+  // --- Deposit Block ---
   {
-    "type": "delay_block",
-    "message0": "delay %1 ms",
-    "args0": [{"type":"field_number","name":"MS","value":500,"min":0,"precision":1}],
+    "type": "deposit_block",
+    "message0": "Deposit at (x:%1 y:%2 heading:%3)",
+    "args0": [
+      { "type": "field_number", "name": "X", "value": 0 },
+      { "type": "field_number", "name": "Y", "value": 0 },
+      { "type": "field_angle", "name": "HEADING", "angle": 0 }
+    ],
     "previousStatement": null,
     "nextStatement": null,
-    "colour": 60,
-    "tooltip": "Delay for ms",
+    "colour": 210,
+    "tooltip": "Deposits at a coordinate",
+    "helpUrl": ""
+  },
+
+  // --- Delay Block ---
+  {
+    "type": "delay_block",
+    "message0": "Delay for %1 ms",
+    "args0": [
+      { "type": "field_number", "name": "TIME", "value": 1000, "min": 0 }
+    ],
+    "previousStatement": null,
+    "nextStatement": null,
+    "colour": 65,
+    "tooltip": "Pause for a time in milliseconds",
+    "helpUrl": ""
+  },
+
+  // --- Move To Block ---
+  {
+    "type": "move_to_block",
+    "message0": "Move to (x:%1 y:%2 heading:%3) speed %4",
+    "args0": [
+      { "type": "field_number", "name": "X", "value": 0 },
+      { "type": "field_number", "name": "Y", "value": 0 },
+      { "type": "field_angle", "name": "HEADING", "angle": 0 },
+      { "type": "field_number", "name": "SPEED", "value": 1, "min": 0, "max": 1, "precision": 0.1 }
+    ],
+    "previousStatement": null,
+    "nextStatement": null,
+    "colour": 300,
+    "tooltip": "Move robot to a position",
     "helpUrl": ""
   }
 ]);
 
-// JS code generator: produce a JSON array from top-level blocks in order.
-function workspaceToJsonArray(workspace) {
-  const top = workspace.getTopBlocks(true);
-  const out = [];
-  for (const b of top) {
-    collectBlock(b, out);
-  }
-  return out;
-}
+// ============================
+// Code Generators
+// ============================
 
-function collectBlock(block, arr) {
-  // Walk a chain of statement blocks (block, next)
-  let current = block;
-  while (current) {
-    const obj = blockToObj(current);
-    if (obj) arr.push(obj);
-    current = current.getNextBlock ? current.getNextBlock() : null;
-  }
-}
+// Root "When Run" block
+Blockly.JavaScript['when_run'] = function(block) {
+  // Get all nested statements under this one
+  const nextCode = Blockly.JavaScript.statementToCode(block, 'DO') || '';
+  // Remove trailing comma and wrap everything in array brackets
+  const clean = nextCode.trim().replace(/,+$/, '');
+  return `[${clean}]`;
+};
 
-function blockToObj(block) {
-  if (!block) return null;
-  const t = block.type;
-  if (t === 'intake_block') {
-    return { cmd: 'INTAKE', args: { row: parseInt(block.getFieldValue('ROW')) } };
-  } else if (t === 'deposit_block') {
-    return {
-      cmd: 'DEPOSIT',
-      args: {
-        x: parseFloat(block.getFieldValue('X')),
-        y: parseFloat(block.getFieldValue('Y')),
-        heading: parseFloat(block.getFieldValue('HEADING'))
-      }
-    };
-  } else if (t === 'delay_block') {
-    return { cmd: 'DELAY', args: { ms: parseInt(block.getFieldValue('MS')) } };
-  } else {
-    // Unknown block - ignore but you may extend later
-    return null;
-  }
-}
+// Intake
+Blockly.JavaScript['intake_block'] = function(block) {
+  const row = block.getFieldValue('ROW');
+  return `{"cmd":"intake","row":${row}},`;
+};
 
-// Export toolbox xml and helper function for app.js
-window.FTC_TOOLBOX_XML = TOOLBOX_XML;
-window.FTC_workspaceToJsonArray = workspaceToJsonArray;
+// Deposit
+Blockly.JavaScript['deposit_block'] = function(block) {
+  const x = block.getFieldValue('X');
+  const y = block.getFieldValue('Y');
+  const heading = block.getFieldValue('HEADING');
+  return `{"cmd":"deposit","x":${x},"y":${y},"heading":${heading}},`;
+};
+
+// Delay
+Blockly.JavaScript['delay_block'] = function(block) {
+  const time = block.getFieldValue('TIME');
+  return `{"cmd":"delay","time":${time}},`;
+};
+
+// Move To
+Blockly.JavaScript['move_to_block'] = function(block) {
+  const x = block.getFieldValue('X');
+  const y = block.getFieldValue('Y');
+  const heading = block.getFieldValue('HEADING');
+  const speed = block.getFieldValue('SPEED');
+  return `{"cmd":"move_to","x":${x},"y":${y},"heading":${heading},"speed":${speed}},`;
+};
