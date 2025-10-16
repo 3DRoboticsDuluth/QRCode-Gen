@@ -19,6 +19,17 @@ header {
   width: 100%;
 }
 
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  #blocklyDiv {
+    height: 55vh;
+  }
+  button { font-size: 0.95em; padding: 0.45em 0.9em; }
+}
+
+/* Make sure QR output fits */
+#qr svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+
 #controls {
   text-align: center;
   margin: 1em;

@@ -1,62 +1,75 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FTC QR Builder</title>
-  <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FTC QR Generator</title>
+  <!-- Prevent browser from requesting /favicon.ico and producing 404s -->
+  <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVQImWNgYGD4z8DAwMDAAAMAAQEA3xgAAAAASUVORK5CYII=">
   <link rel="stylesheet" href="styles.css">
+  <!-- INLINE_LIBS_START -->
+  <!-- Suppress specific Blockly deprecation warning during library load by filtering console.warn -->
+  <script>
+    (function(){
+      var __origWarn = console.warn;
+      console._origWarn = __origWarn;
+      console.warn = function(){
+        try{
+          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('Workspace.getAllVariables was deprecated') !== -1) return;
+          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('getAllVariables was deprecated') !== -1) return;
+        }catch(e){}
+        return __origWarn.apply(console, arguments);
+      };
+    })();
+  </script>
+  <!-- Prefer local copies when available for offline/portable use; fall back to CDN otherwise -->
+  <script>if (!document.querySelector('script[src="blockly.min.js"]')){
+    try { var s=document.createElement('script'); s.src='blockly.min.js'; document.head.appendChild(s);} catch(e){}
+  }</script>
+  <script>if (!document.querySelector('script[src="pako.min.js"]')){
+    try { var s=document.createElement('script'); s.src='pako.min.js'; document.head.appendChild(s);} catch(e){}
+  }</script>
+  <script>if (!document.querySelector('script[src="kjua.min.js"]')){
+    try { var s=document.createElement('script'); s.src='kjua.min.js'; document.head.appendChild(s);} catch(e){}
+  }</script>
+  <!-- CDN fallbacks (used if local files are not present or fail to load) -->
+  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/kjua@0.1.1/kjua.min.js"></script>
+  <!-- Restore console.warn after libs load -->
+  <script>
+    (function(){
+      try{ if (console._origWarn) { console.warn = console._origWarn; delete console._origWarn; } }catch(e){}
+    })();
+  </script>
+  <!-- INLINE_LIBS_END -->
 </head>
 <body>
-  <header>
-    <h1>FTC QR Builder</h1>
-  </header>
+  <h1>FTC QR Generator</h1>
+  <div id="blocklyDiv" style="height:400px;width:100%;"></div>
 
-  <main>
-    <!-- Blockly workspace -->
-    <div id="blocklyDiv"></div>
+  <xml id="toolbox" style="display: none">
+    <category name="Start" colour="#f9c74f">
+      <block type="start"></block>
+    </category>
+    <category name="Actions" colour="#5C68A6">
+      <block type="drive_to"></block>
+      <block type="turn_to_heading"></block>
+      <block type="intake_row"></block>
+      <block type="deposit_at"></block>
+      <block type="delay_ms"></block>
+      <block type="toggle_intake"></block>
+      <block type="set_motor_power"></block>
+    </category>
+  </xml>
 
-    <!-- Toolbox XML directly in HTML -->
-    <xml id="toolbox" style="display: none">
-      <category name="Program" colour="#f9c74f">
-        <block type="start"></block>
-      </category>
-      <category name="Drive" colour="#43aa8b">
-        <block type="drive_to"></block>
-        <block type="turn_to_heading"></block>
-      </category>
-      <category name="Actions" colour="#277da1">
-        <block type="intake_row"></block>
-        <block type="deposit_at"></block>
-        <block type="delay_ms"></block>
-        <block type="toggle_intake"></block>
-        <block type="set_motor_power"></block>
-      </category>
-    </xml>
+  <button id="generateBtn">Generate QR</button>
+  <button id="clearBtn">Clear Workspace</button>
+  <button id="bundleBtn">Create Bundle (no install)</button>
 
-    <!-- Controls -->
-    <div id="controls">
-      <button id="generateBtn">Generate QR</button>
-      <button id="clearBtn">Clear Workspace</button>
-    </div>
+  <div id="info"></div>
+  <div id="qr"></div>
 
-    <!-- QR output -->
-    <div id="output">
-      <p id="info"></p>
-      <div id="qr"></div>
-    </div>
-  </main>
-
-  <footer>
-    <p>Offline-capable | FTC QR Generator | Built with Blockly</p>
-  </footer>
-
-  <!-- External libraries -->
-  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-  <script src="https://unpkg.com/kjua@0.1.0/kjua.min.js"></script>
-  <script src="https://unpkg.com/pako/dist/pako.min.js"></script>
-
-  <!-- Custom scripts -->
   <script src="blocks_custom.js"></script>
   <script src="app.js"></script>
 </body>
