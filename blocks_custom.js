@@ -1,119 +1,172 @@
 // ============================
-// blocks_custom.js
-// Custom Blockly blocks for FTC QR Generator
+// START BLOCK (deletable)
 // ============================
-
-Blockly.defineBlocksWithJsonArray([
-  // --- When Run Block (Program start) ---
-  {
-    "type": "when_run",
-    "message0": "When Run ▶",
-    "nextStatement": null,
-    "colour": 0,
-    "tooltip": "This block marks the start of the program",
-    "helpUrl": ""
-  },
-
-  // --- Intake Block ---
-  {
-    "type": "intake_block",
-    "message0": "Intake row %1",
-    "args0": [
-      { "type": "field_number", "name": "ROW", "value": 1, "min": 1, "max": 3 }
-    ],
-    "previousStatement": null,
-    "nextStatement": null,
-    "colour": 160,
-    "tooltip": "Run intake for a specific row",
-    "helpUrl": ""
-  },
-
-  // --- Deposit Block ---
-  {
-    "type": "deposit_block",
-    "message0": "Deposit at (x:%1 y:%2 heading:%3)",
-    "args0": [
-      { "type": "field_number", "name": "X", "value": 0 },
-      { "type": "field_number", "name": "Y", "value": 0 },
-      { "type": "field_angle", "name": "HEADING", "angle": 0 }
-    ],
-    "previousStatement": null,
-    "nextStatement": null,
-    "colour": 210,
-    "tooltip": "Deposits at a coordinate",
-    "helpUrl": ""
-  },
-
-  // --- Delay Block ---
-  {
-    "type": "delay_block",
-    "message0": "Delay for %1 ms",
-    "args0": [
-      { "type": "field_number", "name": "TIME", "value": 1000, "min": 0 }
-    ],
-    "previousStatement": null,
-    "nextStatement": null,
-    "colour": 65,
-    "tooltip": "Pause for a time in milliseconds",
-    "helpUrl": ""
-  },
-
-  // --- Move To Block ---
-  {
-    "type": "move_to_block",
-    "message0": "Move to (x:%1 y:%2 heading:%3) speed %4",
-    "args0": [
-      { "type": "field_number", "name": "X", "value": 0 },
-      { "type": "field_number", "name": "Y", "value": 0 },
-      { "type": "field_angle", "name": "HEADING", "angle": 0 },
-      { "type": "field_number", "name": "SPEED", "value": 1, "min": 0, "max": 1, "precision": 0.1 }
-    ],
-    "previousStatement": null,
-    "nextStatement": null,
-    "colour": 300,
-    "tooltip": "Move robot to a position",
-    "helpUrl": ""
+Blockly.Blocks['start'] = {
+  init: function() {
+    this.appendDummyInput().appendField("▶ Start");
+    this.setNextStatement(true, null);
+    this.setColour("#f9c74f");
+    this.setTooltip("Program entry point");
+    this.setDeletable(true);
   }
-]);
+};
+
+Blockly.JavaScript['start'] = function(block) {
+  const nextBlock = block.getNextBlock();
+  const plan = [];
+  let current = nextBlock;
+  while (current) {
+    plan.push(Blockly.JavaScript.blockToCode(current));
+    current = current.getNextBlock();
+  }
+  return `[${plan.filter(Boolean).join(',')}]`;
+};
 
 // ============================
-// Code Generators
+// DRIVE TO
 // ============================
-
-// Root "When Run" block
-Blockly.JavaScript['when_run'] = function(block) {
-  // Get all nested statements under this one
-  const nextCode = Blockly.JavaScript.statementToCode(block, 'DO') || '';
-  // Remove trailing comma and wrap everything in array brackets
-  const clean = nextCode.trim().replace(/,+$/, '');
-  return `[${clean}]`;
+Blockly.Blocks['drive_to'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Drive to x:")
+      .appendField(new Blockly.FieldNumber(0), "x")
+      .appendField("y:")
+      .appendField(new Blockly.FieldNumber(0), "y")
+      .appendField("heading:")
+      .appendField(new Blockly.FieldNumber(0, 0, 360), "heading");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#43aa8b");
+  }
 };
 
-// Intake
-Blockly.JavaScript['intake_block'] = function(block) {
-  const row = block.getFieldValue('ROW');
-  return `{"cmd":"intake","row":${row}},`;
+Blockly.JavaScript['drive_to'] = function(block) {
+  const x = block.getFieldValue('x');
+  const y = block.getFieldValue('y');
+  const heading = block.getFieldValue('heading');
+  return JSON.stringify({ cmd: 'drive_to', x, y, heading });
 };
 
-// Deposit
-Blockly.JavaScript['deposit_block'] = function(block) {
-  const x = block.getFieldValue('X');
-  const y = block.getFieldValue('Y');
-  const heading = block.getFieldValue('HEADING');
-  return `{"cmd":"deposit","x":${x},"y":${y},"heading":${heading}},`;
+// ============================
+// TURN TO HEADING
+// ============================
+Blockly.Blocks['turn_to_heading'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Turn to heading")
+      .appendField(new Blockly.FieldNumber(0, 0, 360), "heading");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#f8961e");
+  }
 };
 
-// Delay
-Blockly.JavaScript['delay_block'] = function(block) {
-  const time = block.getFieldValue('TIME');
-  return `{"cmd":"delay","time":${time}},`;
+Blockly.JavaScript['turn_to_heading'] = function(block) {
+  const heading = block.getFieldValue('heading');
+  return JSON.stringify({ cmd: 'turn_to_heading', heading });
 };
 
-// Move To
-Blockly.JavaScript['move_to_block'] = function(block) {
-  const x = block.getFieldValue('X');
-  const y = block.getFieldValue('Y');
-  const heading = block.getFieldValue('HEADING');
-  const speed = block.getFieldValue('SPEED');
-  return `{"cmd":"move_to","x":${x},"y":${y},"heading":${heading},"speed":${speed}},`;
+// ============================
+// INTAKE ROW
+// ============================
+Blockly.Blocks['intake_row'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Intake row")
+      .appendField(new Blockly.FieldNumber(1, 1, 5, 1), "row");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#577590");
+  }
+};
+
+Blockly.JavaScript['intake_row'] = function(block) {
+  const row = block.getFieldValue('row');
+  return JSON.stringify({ cmd: 'intake_row', row });
+};
+
+// ============================
+// DEPOSIT AT
+// ============================
+Blockly.Blocks['deposit_at'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Deposit @ (")
+      .appendField(new Blockly.FieldNumber(0), "x")
+      .appendField(",")
+      .appendField(new Blockly.FieldNumber(0), "y")
+      .appendField(") heading:")
+      .appendField(new Blockly.FieldNumber(0, 0, 360), "heading");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#277da1");
+  }
+};
+
+Blockly.JavaScript['deposit_at'] = function(block) {
+  const x = block.getFieldValue('x');
+  const y = block.getFieldValue('y');
+  const heading = block.getFieldValue('heading');
+  return JSON.stringify({ cmd: 'deposit_at', x, y, heading });
+};
+
+// ============================
+// DELAY MS
+// ============================
+Blockly.Blocks['delay_ms'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Delay for")
+      .appendField(new Blockly.FieldNumber(1000, 0), "ms")
+      .appendField("ms");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#f94144");
+  }
+};
+
+Blockly.JavaScript['delay_ms'] = function(block) {
+  const ms = block.getFieldValue('ms');
+  return JSON.stringify({ cmd: 'delay_ms', ms });
+};
+
+// ============================
+// TOGGLE INTAKE
+// ============================
+Blockly.Blocks['toggle_intake'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Toggle Intake")
+      .appendField(new Blockly.FieldDropdown([["On","true"],["Off","false"]]), "state");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#f3722c");
+  }
+};
+
+Blockly.JavaScript['toggle_intake'] = function(block) {
+  const state = block.getFieldValue('state') === 'true';
+  return JSON.stringify({ cmd: 'toggle_intake', on: state });
+};
+
+// ============================
+// SET MOTOR POWER
+// ============================
+Blockly.Blocks['set_motor_power'] = {
+  init: function() {
+    this.appendDummyInput()
+      .appendField("Set Motor")
+      .appendField(new Blockly.FieldTextInput("left"), "motor")
+      .appendField("Power")
+      .appendField(new Blockly.FieldNumber(0, -1, 1, 0.01), "power");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#90be6d");
+  }
+};
+
+Blockly.JavaScript['set_motor_power'] = function(block) {
+  const motor = block.getFieldValue('motor');
+  const power = parseFloat(block.getFieldValue('power'));
+  return JSON.stringify({ cmd: 'set_motor_power', motor, power });
 };

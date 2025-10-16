@@ -1,27 +1,20 @@
-# FTC QR Generator (Blockly + PWA)
+# FTC QR Builder
 
-A small offline-capable web app to build FTC autonomous sequences with Blockly, compress them and export as QR codes that Limelight can scan.
+Offline Progressive Web App to visually create autonomous command sequences for FTC robots.
+It generates a compressed QR code that can be scanned by a Limelight camera and decoded by the robot.
 
-## Features
-- Drag & drop blocks for `INTAKE`, `DEPOSIT`, `DELAY`.
-- Generate JSON -> zlib(deflate) -> base64 payload.
-- Create a high-error-correction QR (Byte mode used if supported).
-- Save payloads locally (IndexedDB via localForage).
-- Simple PWA support (service worker + manifest).
+### Features
+- Google Blockly drag-and-drop editor
+- Custom blocks: Start, DriveTo, IntakeRow, DepositAt, Delay
+- JSON → gzip → base64 → QR
+- Offline PWA with caching
 
-## How to run (VS Code)
-1. Copy this folder into a workspace and open with VS Code.
-2. Use the *Live Server* extension OR open `index.html` via a local static server (recommended) OR open directly in Chrome (some features like service worker require a server).
-   - Quick: `npx http-server -c-1` or `python -m http.server` in the folder.
-3. Open the page in your phone or laptop browser.
-4. Drag blocks, press **Generate QR**, and either scan the screen with a phone (to test) or use Limelight in barcode pipeline to detect and read the payload.
+### Usage
+1. Open `index.html` in your browser (or host via VS Code Live Server).
+2. Drag out a **Start** block.
+3. Add blocks like **DriveTo**, **Deposit**, **Delay**, etc.
+4. Click **Generate QR** to see the QR code.
+5. The last QR is cached offline for reuse.
 
-## Robot-side decoder (Java)
-This app outputs `base64(zlib(deflate(JSON array)))`. On the robot, decode like:
-
-```java
-byte[] compressed = Base64.getDecoder().decode(payload);
-InflaterInputStream inflater = new InflaterInputStream(new ByteArrayInputStream(compressed));
-String json = new BufferedReader(new InputStreamReader(inflater))
-                 .lines().collect(Collectors.joining("\n"));
-JSONArray arr = new JSONArray(json);
+### Robot Side
+Use `QRPlanDecoder.java` (provided in your FTC project) to decode QR → JSON → commands.
