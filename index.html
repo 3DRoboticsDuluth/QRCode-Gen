@@ -4,39 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FTC QR Generator</title>
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVQImWNgYGD4z8DAwMDAAAMAAQEA3xgAAAAASUVORK5CYII=">
   <link rel="stylesheet" href="styles.css">
-  
-  <!-- INLINE_LIBS_START -->
+
+  <!-- Suppress Blockly warnings -->
   <script>
     (function(){
       var __origWarn = console.warn;
       console._origWarn = __origWarn;
       console.warn = function(){
         try{
-          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('Workspace.getAllVariables was deprecated') !== -1) return;
-          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('getAllVariables was deprecated') !== -1) return;
+          if (arguments && arguments[0] && typeof arguments[0] === 'string' &&
+              (arguments[0].includes('Workspace.getAllVariables was deprecated') || arguments[0].includes('getAllVariables was deprecated'))) 
+            return;
         }catch(e){}
         return __origWarn.apply(console, arguments);
       };
     })();
   </script>
 
+  <!-- Offline-first libraries -->
   <script src="blockly.min.js"></script>
   <script src="pako.min.js"></script>
   <script src="kjua.min.js"></script>
-
-  <!-- CDN fallback -->
-  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/kjua@0.1.1/kjua.min.js"></script>
-
-  <script>
-    (function(){
-      try{ if (console._origWarn) { console.warn = console._origWarn; delete console._origWarn; } }catch(e){}
-    })();
-  </script>
-  <!-- INLINE_LIBS_END -->
 </head>
 <body>
   <h1>FTC QR Generator</h1>
@@ -66,18 +57,6 @@
 
   <script src="blocks_custom.js"></script>
   <script src="app.js"></script>
-
-  <!-- Register service worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js').then(function(registration) {
-          console.log('Service Worker registered with scope:', registration.scope);
-        }, function(err) {
-          console.log('Service Worker registration failed:', err);
-        });
-      });
-    }
-  </script>
+  <script src="sw_register.js"></script>
 </body>
 </html>
