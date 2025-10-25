@@ -1,20 +1,44 @@
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open('ftc-qrcode-cache').then(function(cache) {
-      return cache.addAll([
-        './index.html',
-        './styles.css',
-        './blocks_custom.js',
-        './app.js'
-      ]);
+const CACHE_NAME = 'qrcode-gen-cache-v1';
+const FILES_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/blocks_custom.js',
+  '/blockly.min.js',
+  '/kjua.min.js',
+  '/pako.min.js',
+  '/manifest.json'
+];
+
+self.addEventListener('install', (evt) => {
+  evt.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(FILES_TO_CACHE);
     })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request).then(function(response) {
-      return response || fetch(event.request);
+self.addEventListener('activate', (evt) => {
+  evt.waitUntil(
+    caches.keys().then((keyList) =>
+      Promise.all(
+        keyList.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (evt) => {
+  evt.respondWith(
+    caches.match(evt.request).then((cachedResponse) => {
+      return cachedResponse || fetch(evt.request);
     })
   );
 });

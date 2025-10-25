@@ -4,54 +4,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FTC QR Generator</title>
-  <!-- Prevent browser from requesting /favicon.ico and producing 404s -->
   <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVQImWNgYGD4z8DAwMDAAAMAAQEA3xgAAAAASUVORK5CYII=">
   <link rel="stylesheet" href="styles.css">
-
+  
   <!-- INLINE_LIBS_START -->
   <script>
-    // Suppress specific Blockly deprecation warning
     (function(){
       var __origWarn = console.warn;
       console._origWarn = __origWarn;
       console.warn = function(){
         try{
-          if (arguments && arguments[0] && typeof arguments[0] === 'string' &&
-             (arguments[0].indexOf('Workspace.getAllVariables was deprecated') !== -1 ||
-              arguments[0].indexOf('getAllVariables was deprecated') !== -1)) return;
+          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('Workspace.getAllVariables was deprecated') !== -1) return;
+          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('getAllVariables was deprecated') !== -1) return;
         }catch(e){}
         return __origWarn.apply(console, arguments);
       };
     })();
   </script>
 
-  <!-- Load local files first if available -->
-  <script>
-    function loadScript(src) {
-      var s = document.createElement('script');
-      s.src = src;
-      document.head.appendChild(s);
-    }
+  <script src="blockly.min.js"></script>
+  <script src="pako.min.js"></script>
+  <script src="kjua.min.js"></script>
 
-    // Try to load offline libraries
-    if (document.querySelector('script[src="blockly.min.js"]') === null) loadScript('blockly.min.js');
-    if (document.querySelector('script[src="pako.min.js"]') === null) loadScript('pako.min.js');
-    if (document.querySelector('script[src="kjua.min.js"]') === null) loadScript('kjua.min.js');
-  </script>
-
-  <!-- CDN fallback if offline files are missing -->
+  <!-- CDN fallback -->
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.1.1/kjua.min.js"></script>
 
-  <!-- Restore console.warn -->
   <script>
     (function(){
-      try { if (console._origWarn) { console.warn = console._origWarn; delete console._origWarn; } }catch(e){}
+      try{ if (console._origWarn) { console.warn = console._origWarn; delete console._origWarn; } }catch(e){}
     })();
   </script>
   <!-- INLINE_LIBS_END -->
-
 </head>
 <body>
   <h1>FTC QR Generator</h1>
@@ -81,5 +66,18 @@
 
   <script src="blocks_custom.js"></script>
   <script src="app.js"></script>
+
+  <!-- Register service worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js').then(function(registration) {
+          console.log('Service Worker registered with scope:', registration.scope);
+        }, function(err) {
+          console.log('Service Worker registration failed:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
