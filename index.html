@@ -7,42 +7,51 @@
   <!-- Prevent browser from requesting /favicon.ico and producing 404s -->
   <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVQImWNgYGD4z8DAwMDAAAMAAQEA3xgAAAAASUVORK5CYII=">
   <link rel="stylesheet" href="styles.css">
+
   <!-- INLINE_LIBS_START -->
-  <!-- Suppress specific Blockly deprecation warning during library load by filtering console.warn -->
   <script>
+    // Suppress specific Blockly deprecation warning
     (function(){
       var __origWarn = console.warn;
       console._origWarn = __origWarn;
       console.warn = function(){
         try{
-          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('Workspace.getAllVariables was deprecated') !== -1) return;
-          if (arguments && arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('getAllVariables was deprecated') !== -1) return;
+          if (arguments && arguments[0] && typeof arguments[0] === 'string' &&
+             (arguments[0].indexOf('Workspace.getAllVariables was deprecated') !== -1 ||
+              arguments[0].indexOf('getAllVariables was deprecated') !== -1)) return;
         }catch(e){}
         return __origWarn.apply(console, arguments);
       };
     })();
   </script>
-  <!-- Prefer local copies when available for offline/portable use; fall back to CDN otherwise -->
-  <script>if (!document.querySelector('script[src="blockly.min.js"]')){
-    try { var s=document.createElement('script'); s.src='blockly.min.js'; document.head.appendChild(s);} catch(e){}
-  }</script>
-  <script>if (!document.querySelector('script[src="pako.min.js"]')){
-    try { var s=document.createElement('script'); s.src='pako.min.js'; document.head.appendChild(s);} catch(e){}
-  }</script>
-  <script>if (!document.querySelector('script[src="kjua.min.js"]')){
-    try { var s=document.createElement('script'); s.src='kjua.min.js'; document.head.appendChild(s);} catch(e){}
-  }</script>
-  <!-- CDN fallbacks (used if local files are not present or fail to load) -->
+
+  <!-- Load local files first if available -->
+  <script>
+    function loadScript(src) {
+      var s = document.createElement('script');
+      s.src = src;
+      document.head.appendChild(s);
+    }
+
+    // Try to load offline libraries
+    if (document.querySelector('script[src="blockly.min.js"]') === null) loadScript('blockly.min.js');
+    if (document.querySelector('script[src="pako.min.js"]') === null) loadScript('pako.min.js');
+    if (document.querySelector('script[src="kjua.min.js"]') === null) loadScript('kjua.min.js');
+  </script>
+
+  <!-- CDN fallback if offline files are missing -->
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.1.1/kjua.min.js"></script>
-  <!-- Restore console.warn after libs load -->
+
+  <!-- Restore console.warn -->
   <script>
     (function(){
-      try{ if (console._origWarn) { console.warn = console._origWarn; delete console._origWarn; } }catch(e){}
+      try { if (console._origWarn) { console.warn = console._origWarn; delete console._origWarn; } }catch(e){}
     })();
   </script>
   <!-- INLINE_LIBS_END -->
+
 </head>
 <body>
   <h1>FTC QR Generator</h1>
