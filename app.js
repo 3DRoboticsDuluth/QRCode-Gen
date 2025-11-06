@@ -1,25 +1,140 @@
-// Compatibility shim: Blockly v12 deprecated Workspace.getAllVariables; map it to the new API
+// Compatibility shim: Blockly v12 deprecated Workspace.getAllVariables
 if (Blockly && Blockly.Workspace && typeof Blockly.Workspace.prototype.getAllVariables !== 'function') {
   try {
     Blockly.Workspace.prototype.getAllVariables = function() {
-      // Prefer getVariableMap if available
       if (typeof this.getVariableMap === 'function' && this.getVariableMap()) {
-        try { return this.getVariableMap().getAllVariables(); } catch (e) { /* fallback below */ }
+        try { return this.getVariableMap().getAllVariables(); } catch (e) { }
       }
-      // Fallback to returning empty array to avoid breaking callers
       return [];
     };
-    console.info('Applied compatibility shim: Workspace.getAllVariables -> getVariableMap().getAllVariables()');
-  } catch (e) {
-    // ignore silently if we can't patch
-  }
+    console.info('Applied compatibility shim: Workspace.getAllVariables');
+  } catch (e) { }
 }
 
+// Initialize Blockly workspace
 const workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
   trashcan: true,
-  scrollbars: true
+  scrollbars: true,
+  zoom: { controls: true, wheel: true, startScale: 0.9 }
 });
+
+// Canvas setup for path visualization
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const FIELD_SIZE = 600;
+const TILE_WIDTH = 23.5;
+const FIELD_HALF = 72; // inches
+
+let fieldImage = new Image();
+let imageLoaded = false;
+let currentPath = [];
+let startPos = null;
+let currentAlliance = 'RED';
+let currentSide = 'NORTH';
+
+// Load field image
+fieldImage.onload = function() {
+  imageLoaded = true;
+  updateVisualization();
+};
+fieldImage.onerror = function() {
+  imageLoaded = false;
+  updateVisualization();
+};
+fieldImage.src = 'FTC Field.jpg';
+
+// Start positions from NavSubsystem (NORTH and SOUTH swapped as requested)
+// RED: alliance.sign = -1, BLUE: alliance.sign = +1
+// Start positions from NavSubsystem (corrected - no swap)
+// RED: alliance.sign = -1, BLUE: alliance.sign = +1
+const START_POSITIONS = {
+  RED_NORTH: { 
+    x: 2 * TILE_WIDTH,  // North position
+    y: -1 * 2.75 * TILE_WIDTH,
+    heading: 0 
+  },
+  RED_SOUTH: { 
+    x: -3 * TILE_WIDTH,  // South position
+    y: -1 * 0.5 * TILE_WIDTH,
+    heading: 0 
+  },
+  BLUE_NORTH: { 
+    x: 2 * TILE_WIDTH,  // North position
+    y: 1 * 2.75 * TILE_WIDTH,
+    heading: 0 
+  },
+  BLUE_SOUTH: { 
+    x: -3 * TILE_WIDTH,  // South position
+    y: 1 * 0.5 * TILE_WIDTH,
+    heading: 0 
+  }
+};
+
+// Named poses from NavSubsystem with alliance sign logic
+function getAllianceSign() {
+  return currentAlliance === 'RED' ? -1 : 1;
+}
+
+const NAMED_POSES = {
+  // Spike marks (ground sample positions)
+  spike_near: () => ({
+    x: -1.5 * TILE_WIDTH,
+    y: getAllianceSign() * 1.5 * TILE_WIDTH,
+    heading: getAllianceSign() * 90 * Math.PI / 180
+  }),
+  spike_middle: () => ({
+    x: -0.5 * TILE_WIDTH,
+    y: getAllianceSign() * 1.5 * TILE_WIDTH,
+    heading: getAllianceSign() * 90 * Math.PI / 180
+  }),
+  spike_far: () => ({
+    x: 0.5 * TILE_WIDTH,
+    y: getAllianceSign() * 1.5 * TILE_WIDTH,
+    heading: getAllianceSign() * 90 * Math.PI / 180
+  }),
+  
+  // Loading zone (human player station)
+  loading_zone: () => ({
+    x: -2.5 * TILE_WIDTH,
+    y: getAllianceSign() * -2.5 * TILE_WIDTH,
+    heading: getAllianceSign() * 90 * Math.PI / 180
+  }),
+  
+  // Launch positions (for scoring into high basket)
+  launch_near: () => ({
+    x: 0.5 * TILE_WIDTH,
+    y: getAllianceSign() * 0.5 * TILE_WIDTH,
+    heading: getAllianceSign() * 45 * Math.PI / 180
+  }),
+  launch_far: () => ({
+    x: -2.5 * TILE_WIDTH,
+    y: getAllianceSign() * -0.5 * TILE_WIDTH,
+    heading: getAllianceSign() * 30 * Math.PI / 180
+  }),
+  
+  // Gate (submersible area)
+  gate: () => ({
+    x: 0 * TILE_WIDTH,
+    y: getAllianceSign() * 2 * TILE_WIDTH,
+    heading: getAllianceSign() * -90 * Math.PI / 180
+  }),
+  
+  // Base (observation zone)
+  base: () => ({
+    x: -2 * TILE_WIDTH,
+    y: getAllianceSign() * -1.4 * TILE_WIDTH,
+    heading: getAllianceSign() * 180 * Math.PI / 180
+  })
+};
+
+// Convert Pedro coordinates (origin at center) to canvas pixels
+function pedroToCanvas(x, y) {
+  return {
+    x: (x + FIELD_HALF) * (FIELD_SIZE / (FIELD_HALF * 2)),
+    y: (FIELD_HALF - y) * (FIELD_SIZE / (FIELD_HALF * 2))
+  };
+}
 
 // Ensure Start block exists
 function ensureStartBlock() {
@@ -31,7 +146,323 @@ function ensureStartBlock() {
     startBlock.moveBy(50, 50);
   }
 }
-workspace.addChangeListener(() => ensureStartBlock());
+
+// Update visualization when blocks or alliance changes
+workspace.addChangeListener(() => {
+  ensureStartBlock();
+  updateVisualization();
+});
+
+document.getElementById('alliance').addEventListener('change', (e) => {
+  currentAlliance = e.target.value;
+  updateVisualization();
+});
+
+document.getElementById('side').addEventListener('change', (e) => {
+  currentSide = e.target.value;
+  updateVisualization();
+});
+
+function updateVisualization() {
+  const alliance = document.getElementById('alliance').value;
+  const side = document.getElementById('side').value;
+  currentAlliance = alliance;
+  currentSide = side;
+  
+  const key = `${alliance}_${side}`;
+  startPos = { ...START_POSITIONS[key] };
+  startPos.heading = startPos.heading * Math.PI / 180;
+
+  // Extract path from blocks
+  currentPath = extractPathFromBlocks();
+  
+  // Update waypoints list
+  updateWaypointsList();
+  
+  // Render the field
+  renderField();
+}
+
+function extractPathFromBlocks() {
+  const path = [];
+  const startBlock = workspace.getTopBlocks(true).find(b => b.type === 'start');
+  if (!startBlock) return path;
+
+  let current = startBlock.getNextBlock();
+  while (current) {
+    let waypoint = null;
+    
+    // Drive to block
+    if (current.type === 'drive_to') {
+      const mode = current.getFieldValue('mode');
+      let x, y, heading;
+      
+      if (mode === 'tiles') {
+        const tileX = Number(current.getFieldValue('tile_x')) || 0;
+        const tileY = Number(current.getFieldValue('tile_y')) || 0;
+        x = tileX * TILE_WIDTH;
+        y = tileY * TILE_WIDTH;
+        heading = (Number(current.getFieldValue('heading_tiles')) || 0) * Math.PI / 180;
+      } else {
+        x = Number(current.getFieldValue('x')) || 0;
+        y = Number(current.getFieldValue('y')) || 0;
+        heading = (Number(current.getFieldValue('heading_coords')) || 0) * Math.PI / 180;
+      }
+      
+      waypoint = { x, y, heading, type: 'drive', label: 'Drive' };
+    }
+    
+    // Deposit tile block
+    else if (current.type === 'deposit_tile') {
+      const tileX = Number(current.getFieldValue('tile_x')) || 0;
+      const tileY = Number(current.getFieldValue('tile_y')) || 0;
+      const heading = (Number(current.getFieldValue('heading')) || 0) * Math.PI / 180;
+      waypoint = { 
+        x: tileX * TILE_WIDTH, 
+        y: tileY * TILE_WIDTH, 
+        heading, 
+        type: 'deposit',
+        label: 'Deposit'
+      };
+    }
+    
+    // Deposit near/far block
+    else if (current.type === 'deposit_near_far') {
+      const where = current.getFieldValue('where');
+      const pose = where === 'near' ? NAMED_POSES.launch_near() : NAMED_POSES.launch_far();
+      waypoint = {
+        x: pose.x,
+        y: pose.y,
+        heading: pose.heading,
+        type: 'deposit',
+        label: `Deposit ${where}`
+      };
+    }
+    
+    // Intake row block
+    else if (current.type === 'intake_row') {
+      const row = Number(current.getFieldValue('row')) || 0;
+      let pose;
+      
+      if (row === 0) {
+        // Human player
+        pose = NAMED_POSES.loading_zone();
+        waypoint = {
+          x: pose.x,
+          y: pose.y,
+          heading: pose.heading,
+          type: 'intake',
+          label: 'Human Intake'
+        };
+      } else if (row === 1) {
+        pose = NAMED_POSES.spike_near();
+        waypoint = {
+          x: pose.x,
+          y: pose.y,
+          heading: pose.heading,
+          type: 'intake',
+          label: 'Intake Near'
+        };
+      } else if (row === 2) {
+        pose = NAMED_POSES.spike_middle();
+        waypoint = {
+          x: pose.x,
+          y: pose.y,
+          heading: pose.heading,
+          type: 'intake',
+          label: 'Intake Mid'
+        };
+      } else if (row === 3) {
+        pose = NAMED_POSES.spike_far();
+        waypoint = {
+          x: pose.x,
+          y: pose.y,
+          heading: pose.heading,
+          type: 'intake',
+          label: 'Intake Far'
+        };
+      }
+    }
+    
+    // Intake human block
+    else if (current.type === 'intake_human') {
+      const pose = NAMED_POSES.loading_zone();
+      waypoint = {
+        x: pose.x,
+        y: pose.y,
+        heading: pose.heading,
+        type: 'intake',
+        label: 'Human Intake'
+      };
+    }
+    
+    // Release gate block
+    else if (current.type === 'release_gate') {
+      const pose = NAMED_POSES.gate();
+      waypoint = {
+        x: pose.x,
+        y: pose.y,
+        heading: pose.heading,
+        type: 'action',
+        label: 'Release Gate'
+      };
+    }
+    
+    if (waypoint) {
+      path.push(waypoint);
+    }
+    
+    current = current.getNextBlock();
+  }
+  
+  return path;
+}
+
+function updateWaypointsList() {
+  const list = document.getElementById('waypoints-list');
+  
+  if (currentPath.length === 0) {
+    list.innerHTML = '<div class="info-text">No waypoints. Add blocks to see path.</div>';
+    return;
+  }
+  
+  let html = '';
+  currentPath.forEach((wp, idx) => {
+    let icon = '🚗';
+    if (wp.type === 'deposit') icon = '📦';
+    else if (wp.type === 'intake') icon = '⬇️';
+    else if (wp.type === 'action') icon = '⚙️';
+    
+    const heading = Math.round(wp.heading * 180 / Math.PI);
+    html += `<div class="waypoint-item">${idx + 1}. ${icon} ${wp.label} → (${wp.x.toFixed(1)}, ${wp.y.toFixed(1)}) @ ${heading}°</div>`;
+  });
+  
+  list.innerHTML = html;
+}
+
+function renderField() {
+  ctx.clearRect(0, 0, FIELD_SIZE, FIELD_SIZE);
+
+  // Draw field background
+  if (imageLoaded) {
+    ctx.save();
+    ctx.translate(FIELD_SIZE / 2, FIELD_SIZE / 2);
+    ctx.rotate(Math.PI); // 180 degrees
+    ctx.translate(-FIELD_SIZE / 2, -FIELD_SIZE / 2);
+    ctx.drawImage(fieldImage, 0, 0, FIELD_SIZE, FIELD_SIZE);
+    ctx.restore();
+  } else {
+    // Fallback grid
+    ctx.save();
+    ctx.translate(FIELD_SIZE / 2, FIELD_SIZE / 2);
+    ctx.rotate(Math.PI);
+    ctx.translate(-FIELD_SIZE / 2, -FIELD_SIZE / 2);
+    
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(0, 0, FIELD_SIZE, FIELD_SIZE);
+    
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    const gridSize = FIELD_SIZE / 6;
+    for (let i = 0; i <= 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * gridSize, 0);
+      ctx.lineTo(i * gridSize, FIELD_SIZE);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, i * gridSize);
+      ctx.lineTo(FIELD_SIZE, i * gridSize);
+      ctx.stroke();
+      }
+    ctx.restore();
+  }
+
+  // Draw start position
+  if (startPos) {
+    const pos = pedroToCanvas(startPos.x, startPos.y);
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(-startPos.heading);
+    
+    // Robot body
+    ctx.fillStyle = 'rgba(67, 170, 139, 0.8)';
+    ctx.fillRect(-12, -12, 24, 24);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-12, -12, 24, 24);
+    
+    // Heading arrow
+    ctx.fillStyle = '#f9c74f';
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(-6, -20);
+    ctx.lineTo(6, -20);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+  }
+
+  // Draw path
+  if (currentPath.length > 0 && startPos) {
+    // Draw lines connecting waypoints
+    ctx.strokeStyle = 'rgba(249, 199, 79, 0.6)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    
+    const start = pedroToCanvas(startPos.x, startPos.y);
+    ctx.moveTo(start.x, start.y);
+    
+    currentPath.forEach(wp => {
+      const pos = pedroToCanvas(wp.x, wp.y);
+      ctx.lineTo(pos.x, pos.y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw waypoints
+    currentPath.forEach((wp, idx) => {
+      const pos = pedroToCanvas(wp.x, wp.y);
+      
+      // Waypoint circle with type-specific colors
+      if (wp.type === 'deposit') {
+        ctx.fillStyle = '#277da1';
+      } else if (wp.type === 'intake') {
+        ctx.fillStyle = '#f94144';
+      } else if (wp.type === 'action') {
+        ctx.fillStyle = '#b5179e';
+      } else {
+        ctx.fillStyle = '#43aa8b';
+      }
+      
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Heading indicator
+      ctx.save();
+      ctx.translate(pos.x, pos.y);
+      ctx.rotate(-wp.heading);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -15);
+      ctx.stroke();
+      ctx.restore();
+      
+      // Label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(idx + 1, pos.x + 10, pos.y - 10);
+    });
+  }
+}
 
 // Utility to dynamically load a script
 function loadScript(url) {
@@ -45,7 +476,7 @@ function loadScript(url) {
   });
 }
 
-// Ensure kjua is available; try multiple CDNs if necessary
+// Ensure kjua is available
 async function ensureKjua() {
   if (typeof kjua === 'function') return;
   const sources = [
@@ -58,98 +489,56 @@ async function ensureKjua() {
       await loadScript(src);
       if (typeof kjua === 'function') return;
     } catch (e) {
-      // try next source
-      console.warn('Failed to load kjua from', src, e && e.message ? e.message : e);
+      console.warn('Failed to load kjua from', src);
     }
   }
   throw new Error('kjua library could not be loaded from any CDN');
 }
 
-// Generate QR (tries to load kjua dynamically if missing)
+// Generate QR
 document.getElementById('generateBtn').addEventListener('click', async () => {
   const plan = generatePlanJSON();
-  if (!plan.length) return;
+  if (!plan.length) {
+    document.getElementById('info').textContent = 'Add blocks to generate QR';
+    return;
+  }
 
   const b64 = compressAndEncode(plan);
-  document.getElementById('info').textContent = `Plan steps: ${plan.length} | Data length: ${b64.length}`;
-  warnIfLargePayload(b64);
+  document.getElementById('info').textContent = `Steps: ${plan.length} | Size: ${b64.length} chars`;
 
   const qrContainer = document.getElementById('qr');
   qrContainer.innerHTML = '';
 
   try {
     await ensureKjua();
-    const qr = kjua({ render: 'svg', text: b64, size: 400, ecLevel: 'H' });
+    const qr = kjua({ render: 'svg', text: b64, size: 250, ecLevel: 'H' });
     qrContainer.appendChild(qr);
   } catch (e) {
-    // Try an image-based QR API as a fallback (works if the device has internet).
-    // Note: very large payloads may exceed URL length limits and fail.
-    document.getElementById('info').textContent += ' | kjua missing: trying public QR image API...';
-    console.warn('kjua is not available. Attempting image-based QR fallback.', e);
-
-    try {
-      // Use api.qrserver.com which accepts larger payloads than some other services
-      const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(b64);
-      const img = document.createElement('img');
-      img.alt = 'QR code';
-      img.src = qrUrl;
-      img.style.maxWidth = '100%';
-      img.onload = () => {
-        qrContainer.appendChild(img);
-        document.getElementById('info').textContent = `Plan steps: ${plan.length} | Data length: ${b64.length} | QR from image API`;
-      };
-      img.onerror = () => {
-        // If image fails (likely due to payload length or network), fall back to raw payload
-        console.warn('Image-based QR API failed, falling back to payload view.');
-        document.getElementById('info').textContent += ' | Error: QR image API failed. Showing payload below.';
-        const pre = document.createElement('pre');
-        pre.textContent = b64;
-        qrContainer.appendChild(pre);
-        const a = document.createElement('a');
-        a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(b64);
-        a.download = 'qr_payload.txt';
-        a.textContent = 'Download payload';
-        a.style.display = 'block';
-        a.style.marginTop = '8px';
-        qrContainer.appendChild(a);
-      };
-      qrContainer.appendChild(img);
-    } catch (imgErr) {
-      console.error('Image fallback failed', imgErr);
-      document.getElementById('info').textContent += ' | Error: QR library (kjua) not available. Showing payload below.';
-      const pre = document.createElement('pre');
-      pre.textContent = b64;
-      qrContainer.appendChild(pre);
-      const a = document.createElement('a');
-      a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(b64);
-      a.download = 'qr_payload.txt';
-      a.textContent = 'Download payload';
-      a.style.display = 'block';
-      a.style.marginTop = '8px';
-      qrContainer.appendChild(a);
-    }
+    console.warn('kjua not available, trying image API', e);
+    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(b64);
+    const img = document.createElement('img');
+    img.alt = 'QR code';
+    img.src = qrUrl;
+    qrContainer.appendChild(img);
   }
 
   localStorage.setItem('last_qr_payload', b64);
 });
 
-// Create a self-contained bundle in the browser (no console or shell required)
+// Bundle creation
 document.getElementById('bundleBtn').addEventListener('click', async () => {
   const info = document.getElementById('info');
   info.textContent = 'Building bundle...';
 
-  // Read index.html
   const resp = await fetch(location.pathname);
   let html = await resp.text();
 
-  // Helper to fetch a script by src (try relative first, then CDN)
   async function fetchScript(src) {
     try {
       const r = await fetch(src);
       if (!r.ok) throw new Error('bad');
       return await r.text();
     } catch (e) {
-      // try absolute URL if src is relative
       try {
         const abs = new URL(src, location.href).href;
         const r2 = await fetch(abs);
@@ -159,17 +548,14 @@ document.getElementById('bundleBtn').addEventListener('click', async () => {
     }
   }
 
-  // Inline known script tags (blockly, pako, kjua, blocks_custom.js, app.js)
   const scriptRegex = /<script[^>]*src=["']([^"']+)["'][^>]*><\/script>/gi;
-  let match; const inlines = [];
+  let match;
   while ((match = scriptRegex.exec(html)) !== null) {
     const src = match[1];
     info.textContent = 'Inlining ' + src;
     let content = null;
-    // try relative path first
     try { content = await fetchScript(src); } catch(e) { content = null; }
     if (!content) {
-      // As a fallback, try the exact CDN URLs we used earlier
       if (src.includes('blockly')) content = await fetchScript('https://unpkg.com/blockly/blockly.min.js');
       if (src.includes('pako')) content = await fetchScript('https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js');
       if (src.includes('kjua')) content = await fetchScript('https://cdn.jsdelivr.net/npm/kjua@0.1.1/kjua.min.js');
@@ -177,12 +563,9 @@ document.getElementById('bundleBtn').addEventListener('click', async () => {
     if (content) {
       const inlineTag = `<script>\n/* inlined ${src} */\n${content}\n<\/script>`;
       html = html.replace(match[0], inlineTag);
-    } else {
-      // leave the original tag (CDN will be attempted when opened)
     }
   }
 
-  // Inline CSS link tags
   const cssRegex = /<link[^>]*href=["']([^"']+\.css)["'][^>]*>/gi;
   while ((match = cssRegex.exec(html)) !== null) {
     const href = match[1];
@@ -194,16 +577,15 @@ document.getElementById('bundleBtn').addEventListener('click', async () => {
         const inline = `<style>\n/* inlined ${href} */\n${css}\n</style>`;
         html = html.replace(match[0], inline);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { }
   }
 
-  // Trigger download of the built HTML
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'bundle.html'; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
-  info.textContent = 'Bundle downloaded (bundle.html). Copy this file to devices.';
+  info.textContent = 'Bundle downloaded!';
 });
 
 // Clear workspace
@@ -213,95 +595,48 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('qr').innerHTML = '';
   document.getElementById('info').textContent = '';
   ensureStartBlock();
+  updateVisualization();
 });
 
-// Safe traverse starting from Start block
+// Generate plan JSON (same as before)
 function generatePlanJSON() {
   const startBlock = workspace.getTopBlocks(true).find(b => b.type === 'start');
   if (!startBlock) return [];
 
   const plan = [];
-  // Ensure the JavaScript code generator is initialized for this workspace.
-  // Without this, calling Blockly.JavaScript.blockToCode will throw:
-  // "CodeGenerator init was not called before blockToCode was called."
   if (Blockly && Blockly.JavaScript && typeof Blockly.JavaScript.init === 'function') {
     try {
       Blockly.JavaScript.init(workspace);
     } catch (e) {
-      // ignore init errors and continue; blockToCode will throw if still uninitialized
       console.warn('Blockly.JavaScript.init() failed:', e);
     }
   }
 
   let current = startBlock.getNextBlock();
-
   while (current) {
-    // If a generator function exists for this block type, use it. Otherwise log a clearer warning
-    // and use the fallback serialization so generation can continue.
     const genFn = Blockly && Blockly.JavaScript && Blockly.JavaScript[current.type];
     if (typeof genFn === 'function') {
-      // Call the registered generator directly. Our generators return JSON strings.
       try {
         let code = genFn(current);
         if (Array.isArray(code)) code = code[0];
         if (code && code !== 'undefined') {
           plan.push(code);
-        } else {
-          console.warn('Generator returned empty/undefined for', current.type);
         }
       } catch (e) {
-        console.warn('Direct generator call threw for', current.type, e && e.message ? e.message : e);
-        // Attempt previous fallback serialization
-        try {
-          let direct = genFn(current);
-          if (Array.isArray(direct)) direct = direct[0];
-          if (direct && direct !== 'undefined') {
-            plan.push(direct);
-            console.info('Fallback: used direct generator call for', current.type);
-          }
-        } catch (dErr) {
-          console.warn('Direct generator call failed for', current.type, dErr && dErr.message ? dErr.message : dErr);
-        }
-      }
-    } else {
-      // No generator found for this block type
-      const available = Object.keys(Blockly && Blockly.JavaScript ? Blockly.JavaScript : {}).filter(k => typeof Blockly.JavaScript[k] === 'function');
-      console.warn('No code generator found for block type:', current.type, '| Available generators:', available.join(', '));
-
-      // Fallback serialization: capture named field values into a JSON entry
-      try {
-        const fields = {};
-        if (current.inputList && current.inputList.length) {
-          current.inputList.forEach(input => {
-            if (!input.fieldRow) return;
-            input.fieldRow.forEach(field => {
-              if (field && field.name) {
-                try { fields[field.name] = current.getFieldValue(field.name); } catch (_) { /* ignore */ }
-              }
-            });
-          });
-        }
-        if (Object.keys(fields).length) {
-          plan.push(JSON.stringify(Object.assign({cmd: current.type}, fields)));
-        } else {
-          plan.push(JSON.stringify({cmd: current.type}));
-        }
-      } catch (serr) {
-        console.warn('Fallback serialization failed for', current.type, serr);
+        console.warn('Generator error for', current.type, e);
       }
     }
     current = current.getNextBlock();
   }
 
-  // Finish the generator so any post-processing occurs and internal state is cleaned up
   if (Blockly && Blockly.JavaScript && typeof Blockly.JavaScript.finish === 'function') {
-    try { Blockly.JavaScript.finish(workspace); } catch (e) { /* ignore */ }
+    try { Blockly.JavaScript.finish(workspace); } catch (e) { }
   }
 
   return plan;
 }
 
-// Compress + Base64 encode
+// Compress and encode
 function compressAndEncode(plan) {
   const json = JSON.stringify(plan);
   const gzip = pako.gzip(json);
@@ -311,16 +646,10 @@ function compressAndEncode(plan) {
 }
 
 // Service worker
-// Service worker (register only on secure origin or localhost)
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-  try { navigator.serviceWorker.register('sw.js'); } catch (e) { /* ignore */ }
+  try { navigator.serviceWorker.register('sw.js'); } catch (e) { }
 }
 
-// Warn when payload is likely too large for a single QR code (heuristic)
-function warnIfLargePayload(b64) {
-  // QR capacity varies by version and error correction; ~1200 chars is a conservative practical limit
-  if (b64.length > 1200) {
-    document.getElementById('info').textContent += ' | Warning: payload may be too large for a single QR code (consider splitting).';
-    console.warn('Payload length', b64.length, 'may exceed single QR capacity');
-  }
-}
+// Initial setup
+ensureStartBlock();
+updateVisualization();

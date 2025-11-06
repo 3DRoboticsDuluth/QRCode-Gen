@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FTC QR Generator</title>
+  <title>FTC QR Generator with Path Planner</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVQImWNgYGD4z8DAwMDAAAMAAQEA3xgAAAAASUVORK5CYII=">
   <link rel="stylesheet" href="styles.css">
@@ -30,8 +30,51 @@
   <script src="kjua.min.js"></script>
 </head>
 <body>
-  <h1>FTC QR Generator</h1>
-  <div id="blocklyDiv" style="height:400px;width:100%;"></div>
+  <!-- LEFT PANEL: Blockly -->
+  <div id="left-panel">
+    <div id="blockly-header">
+      <h1>🤖 FTC QR Generator</h1>
+      <div id="blockly-controls">
+        <button id="generateBtn">Generate QR</button>
+        <button id="clearBtn">Clear</button>
+        <button id="bundleBtn">Bundle</button>
+      </div>
+    </div>
+    <div id="blocklyDiv"></div>
+    <div id="blockly-output">
+      <div id="info"></div>
+      <div id="qr"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Path Visualizer -->
+  <div id="right-panel">
+    <div id="path-header">
+      <h2>📍 Path Visualizer</h2>
+      <div id="start-controls">
+        <label>Alliance:</label>
+        <select id="alliance">
+          <option value="RED">Red</option>
+          <option value="BLUE">Blue</option>
+        </select>
+        <label>Side:</label>
+        <select id="side">
+          <option value="NORTH">North</option>
+          <option value="SOUTH">South</option>
+        </select>
+      </div>
+      <div class="info-text">Path updates as you build</div>
+    </div>
+    
+    <div id="canvas-container">
+      <canvas id="canvas" width="600" height="600"></canvas>
+    </div>
+
+    <div id="path-info">
+      <h3>Path Details</h3>
+      <div id="waypoints-list"></div>
+    </div>
+  </div>
 
   <xml id="toolbox" style="display: none">
     <category name="Start" colour="#f9c74f">
@@ -47,13 +90,6 @@
       <block type="deposit_tile"></block>
     </category>
   </xml>
-
-  <button id="generateBtn">Generate QR</button>
-  <button id="clearBtn">Clear Workspace</button>
-  <button id="bundleBtn">Create Bundle (no install)</button>
-
-  <div id="info"></div>
-  <div id="qr"></div>
 
   <script src="blocks_custom.js"></script>
   <script src="app.js"></script>
