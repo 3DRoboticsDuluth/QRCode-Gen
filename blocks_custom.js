@@ -21,18 +21,27 @@ Blockly.JavaScript['start'] = function(block) {
       const gen = Blockly.JavaScript[next.type];
       if (typeof gen === 'function') {
         const code = gen(next);
-        if (code && code !== 'undefined') plan.push(code);
+        if (code && code !== 'undefined') {
+          // Parse the JSON string to get the actual object
+          try {
+            const obj = JSON.parse(code);
+            plan.push(obj);
+          } catch (e) {
+            console.warn('Failed to parse JSON for', next.type, ':', code);
+            plan.push({cmd: next.type, error: 'parse_failed'});
+          }
+        }
       } else {
         // fallback minimal serialization
-        plan.push(JSON.stringify({cmd: next.type}));
+        plan.push({cmd: next.type});
       }
     } catch (e) {
       console.warn('Generator error for', next.type, e);
-      plan.push(JSON.stringify({cmd: next.type}));
+      plan.push({cmd: next.type, error: 'generator_failed'});
     }
     next = next.getNextBlock();
   }
-  return `[${plan.join(',')}]`;
+  return JSON.stringify(plan);
 };
 
 // DRIVE TO (coordinates or tile-based)

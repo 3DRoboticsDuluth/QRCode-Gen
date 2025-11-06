@@ -620,7 +620,14 @@ function generatePlanJSON() {
         let code = genFn(current);
         if (Array.isArray(code)) code = code[0];
         if (code && code !== 'undefined') {
-          plan.push(code);
+          // Parse the JSON string to get the actual object
+          try {
+            const obj = JSON.parse(code);
+            plan.push(obj);  // ← NOW pushing the object, not the string
+          } catch (parseErr) {
+            console.warn('Failed to parse JSON for', current.type, ':', code);
+            plan.push({cmd: current.type, error: 'parse_failed'});
+          }
         }
       } catch (e) {
         console.warn('Generator error for', current.type, e);
