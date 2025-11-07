@@ -11,6 +11,18 @@ if (Blockly && Blockly.Workspace && typeof Blockly.Workspace.prototype.getAllVar
   } catch (e) { }
 }
 
+// Pedro Pathing Constants (placeholder - can be tuned)
+const PEDRO_CONSTANTS = {
+  xMovementVelocity: 30, // inches/sec
+  yMovementVelocity: 30,
+  turnVelocity: 90, // degrees/sec (converted to rad/sec in calcs)
+  
+  // Action times (seconds)
+  intakeTime: 1.5,
+  depositTime: 2.0,
+  releaseGateTime: 1.0
+};
+
 // Initialize Blockly workspace
 const workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
@@ -27,11 +39,20 @@ const TILE_WIDTH = 23.5;
 const FIELD_HALF = 72; // inches
 
 let fieldImage = new Image();
+let robotImage = new Image();
 let imageLoaded = false;
+let robotImageLoaded = false;
 let currentPath = [];
 let startPos = null;
 let currentAlliance = 'RED';
 let currentSide = 'NORTH';
+
+// Animation state
+let animationRunning = false;
+let animationProgress = 0; // 0 to 1
+let animationStartTime = 0;
+let totalPathTime = 0;
+let pathSegments = []; // {start, end, duration, type}
 
 // Load field image
 fieldImage.onload = function() {
@@ -44,28 +65,36 @@ fieldImage.onerror = function() {
 };
 fieldImage.src = 'FTC Field.jpg';
 
-// Start positions from NavSubsystem (NORTH and SOUTH swapped as requested)
-// RED: alliance.sign = -1, BLUE: alliance.sign = +1
-// Start positions from NavSubsystem (corrected - no swap)
-// RED: alliance.sign = -1, BLUE: alliance.sign = +1
+// Load robot image
+robotImage.onload = function() {
+  robotImageLoaded = true;
+  updateVisualization();
+};
+robotImage.onerror = function() {
+  robotImageLoaded = false;
+  updateVisualization();
+};
+robotImage.src = 'robot.png';
+
+// Start positions
 const START_POSITIONS = {
   RED_NORTH: { 
-    x: 2 * TILE_WIDTH,  // North position
+    x: 2 * TILE_WIDTH,
     y: -1 * 2.75 * TILE_WIDTH,
     heading: 0 
   },
   RED_SOUTH: { 
-    x: -3 * TILE_WIDTH,  // South position
+    x: -3 * TILE_WIDTH,
     y: -1 * 0.5 * TILE_WIDTH,
     heading: 0 
   },
   BLUE_NORTH: { 
-    x: 2 * TILE_WIDTH,  // North position
+    x: 2 * TILE_WIDTH,
     y: 1 * 2.75 * TILE_WIDTH,
     heading: 0 
   },
   BLUE_SOUTH: { 
-    x: -3 * TILE_WIDTH,  // South position
+    x: -3 * TILE_WIDTH,
     y: 1 * 0.5 * TILE_WIDTH,
     heading: 0 
   }
@@ -77,7 +106,6 @@ function getAllianceSign() {
 }
 
 const NAMED_POSES = {
-  // Spike marks (ground sample positions)
   spike_near: () => ({
     x: -1.5 * TILE_WIDTH,
     y: getAllianceSign() * 1.5 * TILE_WIDTH,
@@ -93,15 +121,11 @@ const NAMED_POSES = {
     y: getAllianceSign() * 1.5 * TILE_WIDTH,
     heading: getAllianceSign() * 90 * Math.PI / 180
   }),
-  
-  // Loading zone (human player station)
   loading_zone: () => ({
     x: -2.5 * TILE_WIDTH,
     y: getAllianceSign() * -2.5 * TILE_WIDTH,
     heading: getAllianceSign() * 90 * Math.PI / 180
   }),
-  
-  // Launch positions (for scoring into high basket)
   launch_near: () => ({
     x: 0.5 * TILE_WIDTH,
     y: getAllianceSign() * 0.5 * TILE_WIDTH,
@@ -112,15 +136,11 @@ const NAMED_POSES = {
     y: getAllianceSign() * -0.5 * TILE_WIDTH,
     heading: getAllianceSign() * 30 * Math.PI / 180
   }),
-  
-  // Gate (submersible area)
   gate: () => ({
     x: 0 * TILE_WIDTH,
     y: getAllianceSign() * 2 * TILE_WIDTH,
     heading: getAllianceSign() * -90 * Math.PI / 180
   }),
-  
-  // Base (observation zone)
   base: () => ({
     x: -2 * TILE_WIDTH,
     y: getAllianceSign() * -1.4 * TILE_WIDTH,
@@ -128,12 +148,128 @@ const NAMED_POSES = {
   })
 };
 
-// Convert Pedro coordinates (origin at center) to canvas pixels
+// Convert Pedro coordinates to canvas pixels
 function pedroToCanvas(x, y) {
   return {
     x: (x + FIELD_HALF) * (FIELD_SIZE / (FIELD_HALF * 2)),
     y: (FIELD_HALF - y) * (FIELD_SIZE / (FIELD_HALF * 2))
   };
+}
+
+// Calculate time to move between two poses
+function calculateMoveTime(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  // Heading difference
+  let dHeading = to.heading - from.heading;
+  while (dHeading > Math.PI) dHeading -= 2 * Math.PI;
+  while (dHeading < -Math.PI) dHeading += 2 * Math.PI;
+  const turnAmount = Math.abs(dHeading) * 180 / Math.PI;
+  
+  // Time for linear movement
+  const linearTime = distance / Math.sqrt(
+    PEDRO_CONSTANTS.xMovementVelocity ** 2 + 
+    PEDRO_CONSTANTS.yMovementVelocity ** 2
+  );
+  
+  // Time for turn
+  const turnTime = turnAmount / PEDRO_CONSTANTS.turnVelocity;
+  
+  // Return max (simultaneous movement)
+  return Math.max(linearTime, turnTime);
+}
+
+// Calculate path segments with timing
+function calculatePathSegments() {
+  if (!startPos || currentPath.length === 0) {
+    pathSegments = [];
+    totalPathTime = 0;
+    return;
+  }
+  
+  const segments = [];
+  let currentPose = { ...startPos };
+  let cumulativeTime = 0;
+  
+  currentPath.forEach((wp, idx) => {
+    // Movement segment
+    const moveTime = calculateMoveTime(currentPose, wp);
+    segments.push({
+      startPose: { ...currentPose },
+      endPose: { x: wp.x, y: wp.y, heading: wp.heading },
+      startTime: cumulativeTime,
+      duration: moveTime,
+      type: 'move',
+      label: wp.label
+    });
+    cumulativeTime += moveTime;
+    
+    // Action segment
+    let actionTime = 0;
+    if (wp.type === 'intake') {
+      actionTime = PEDRO_CONSTANTS.intakeTime;
+    } else if (wp.type === 'deposit') {
+      actionTime = PEDRO_CONSTANTS.depositTime;
+    } else if (wp.type === 'action') {
+      actionTime = PEDRO_CONSTANTS.releaseGateTime;
+    }
+    
+    if (actionTime > 0) {
+      segments.push({
+        startPose: { x: wp.x, y: wp.y, heading: wp.heading },
+        endPose: { x: wp.x, y: wp.y, heading: wp.heading },
+        startTime: cumulativeTime,
+        duration: actionTime,
+        type: 'action',
+        actionType: wp.type,
+        label: wp.label
+      });
+      cumulativeTime += actionTime;
+    }
+    
+    currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
+  });
+  
+  pathSegments = segments;
+  totalPathTime = cumulativeTime;
+  updateTimerDisplay();
+}
+
+// Get robot pose at a given time
+function getRobotPoseAtTime(time) {
+  if (pathSegments.length === 0) return null;
+  
+  for (const seg of pathSegments) {
+    if (time >= seg.startTime && time < seg.startTime + seg.duration) {
+      const t = (time - seg.startTime) / seg.duration;
+      
+      if (seg.type === 'action') {
+        return { ...seg.startPose };
+      }
+      
+      // Interpolate position
+      const x = seg.startPose.x + (seg.endPose.x - seg.startPose.x) * t;
+      const y = seg.startPose.y + (seg.endPose.y - seg.startPose.y) * t;
+      
+      // Interpolate heading
+      let dh = seg.endPose.heading - seg.startPose.heading;
+      while (dh > Math.PI) dh -= 2 * Math.PI;
+      while (dh < -Math.PI) dh += 2 * Math.PI;
+      const heading = seg.startPose.heading + dh * t;
+      
+      return { x, y, heading };
+    }
+  }
+  
+  // Past end of path
+  if (time >= totalPathTime && pathSegments.length > 0) {
+    const lastSeg = pathSegments[pathSegments.length - 1];
+    return { ...lastSeg.endPose };
+  }
+  
+  return { ...startPos };
 }
 
 // Ensure Start block exists
@@ -173,13 +309,9 @@ function updateVisualization() {
   startPos = { ...START_POSITIONS[key] };
   startPos.heading = startPos.heading * Math.PI / 180;
 
-  // Extract path from blocks
   currentPath = extractPathFromBlocks();
-  
-  // Update waypoints list
+  calculatePathSegments();
   updateWaypointsList();
-  
-  // Render the field
   renderField();
 }
 
@@ -192,7 +324,6 @@ function extractPathFromBlocks() {
   while (current) {
     let waypoint = null;
     
-    // Drive to block
     if (current.type === 'drive_to') {
       const mode = current.getFieldValue('mode');
       let x, y, heading;
@@ -212,7 +343,6 @@ function extractPathFromBlocks() {
       waypoint = { x, y, heading, type: 'drive', label: 'Drive' };
     }
     
-    // Deposit tile block
     else if (current.type === 'deposit_tile') {
       const tileX = Number(current.getFieldValue('tile_x')) || 0;
       const tileY = Number(current.getFieldValue('tile_y')) || 0;
@@ -226,7 +356,6 @@ function extractPathFromBlocks() {
       };
     }
     
-    // Deposit near/far block
     else if (current.type === 'deposit_near_far') {
       const where = current.getFieldValue('where');
       const pose = where === 'near' ? NAMED_POSES.launch_near() : NAMED_POSES.launch_far();
@@ -239,13 +368,11 @@ function extractPathFromBlocks() {
       };
     }
     
-    // Intake row block
     else if (current.type === 'intake_row') {
       const row = Number(current.getFieldValue('row')) || 0;
       let pose;
       
       if (row === 0) {
-        // Human player
         pose = NAMED_POSES.loading_zone();
         waypoint = {
           x: pose.x,
@@ -284,7 +411,6 @@ function extractPathFromBlocks() {
       }
     }
     
-    // Intake human block
     else if (current.type === 'intake_human') {
       const pose = NAMED_POSES.loading_zone();
       waypoint = {
@@ -296,7 +422,6 @@ function extractPathFromBlocks() {
       };
     }
     
-    // Release gate block
     else if (current.type === 'release_gate') {
       const pose = NAMED_POSES.gate();
       waypoint = {
@@ -327,17 +452,45 @@ function updateWaypointsList() {
   }
   
   let html = '';
+  let cumulativeTime = 0;
+  let currentPose = { ...startPos };
+  
   currentPath.forEach((wp, idx) => {
     let icon = '🚗';
     if (wp.type === 'deposit') icon = '📦';
     else if (wp.type === 'intake') icon = '⬇️';
     else if (wp.type === 'action') icon = '⚙️';
     
+    const moveTime = calculateMoveTime(currentPose, wp);
+    cumulativeTime += moveTime;
+    
+    let actionTime = 0;
+    if (wp.type === 'intake') actionTime = PEDRO_CONSTANTS.intakeTime;
+    else if (wp.type === 'deposit') actionTime = PEDRO_CONSTANTS.depositTime;
+    else if (wp.type === 'action') actionTime = PEDRO_CONSTANTS.releaseGateTime;
+    
+    cumulativeTime += actionTime;
+    
     const heading = Math.round(wp.heading * 180 / Math.PI);
-    html += `<div class="waypoint-item">${idx + 1}. ${icon} ${wp.label} → (${wp.x.toFixed(1)}, ${wp.y.toFixed(1)}) @ ${heading}°</div>`;
+    html += `<div class="waypoint-item">${idx + 1}. ${icon} ${wp.label} @ ${cumulativeTime.toFixed(1)}s</div>`;
+    
+    currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
   });
   
   list.innerHTML = html;
+}
+
+function updateTimerDisplay() {
+  const timerEl = document.getElementById('timer-display');
+  const remaining = 30 - totalPathTime;
+  
+  if (remaining < 0) {
+    timerEl.textContent = `⏱️ ${totalPathTime.toFixed(1)}s (${Math.abs(remaining).toFixed(1)}s OVER)`;
+    timerEl.style.color = '#f94144';
+  } else {
+    timerEl.textContent = `⏱️ ${totalPathTime.toFixed(1)}s / 30s (${remaining.toFixed(1)}s left)`;
+    timerEl.style.color = remaining < 5 ? '#f9c74f' : '#43aa8b';
+  }
 }
 
 function renderField() {
@@ -347,12 +500,11 @@ function renderField() {
   if (imageLoaded) {
     ctx.save();
     ctx.translate(FIELD_SIZE / 2, FIELD_SIZE / 2);
-    ctx.rotate(Math.PI); // 180 degrees
+    ctx.rotate(Math.PI);
     ctx.translate(-FIELD_SIZE / 2, -FIELD_SIZE / 2);
     ctx.drawImage(fieldImage, 0, 0, FIELD_SIZE, FIELD_SIZE);
     ctx.restore();
   } else {
-    // Fallback grid
     ctx.save();
     ctx.translate(FIELD_SIZE / 2, FIELD_SIZE / 2);
     ctx.rotate(Math.PI);
@@ -374,39 +526,12 @@ function renderField() {
       ctx.moveTo(0, i * gridSize);
       ctx.lineTo(FIELD_SIZE, i * gridSize);
       ctx.stroke();
-      }
-    ctx.restore();
-  }
-
-  // Draw start position
-  if (startPos) {
-    const pos = pedroToCanvas(startPos.x, startPos.y);
-    ctx.save();
-    ctx.translate(pos.x, pos.y);
-    ctx.rotate(-startPos.heading);
-    
-    // Robot body
-    ctx.fillStyle = 'rgba(67, 170, 139, 0.8)';
-    ctx.fillRect(-12, -12, 24, 24);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-12, -12, 24, 24);
-    
-    // Heading arrow
-    ctx.fillStyle = '#f9c74f';
-    ctx.beginPath();
-    ctx.moveTo(0, -12);
-    ctx.lineTo(-6, -20);
-    ctx.lineTo(6, -20);
-    ctx.closePath();
-    ctx.fill();
-    
+    }
     ctx.restore();
   }
 
   // Draw path
   if (currentPath.length > 0 && startPos) {
-    // Draw lines connecting waypoints
     ctx.strokeStyle = 'rgba(249, 199, 79, 0.6)';
     ctx.lineWidth = 3;
     ctx.setLineDash([5, 5]);
@@ -426,7 +551,6 @@ function renderField() {
     currentPath.forEach((wp, idx) => {
       const pos = pedroToCanvas(wp.x, wp.y);
       
-      // Waypoint circle with type-specific colors
       if (wp.type === 'deposit') {
         ctx.fillStyle = '#277da1';
       } else if (wp.type === 'intake') {
@@ -444,7 +568,6 @@ function renderField() {
       ctx.lineWidth = 2;
       ctx.stroke();
       
-      // Heading indicator
       ctx.save();
       ctx.translate(pos.x, pos.y);
       ctx.rotate(-wp.heading);
@@ -456,15 +579,94 @@ function renderField() {
       ctx.stroke();
       ctx.restore();
       
-      // Label
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 11px sans-serif';
       ctx.fillText(idx + 1, pos.x + 10, pos.y - 10);
     });
   }
+
+  // Draw robot
+  let robotPose = startPos;
+  if (animationRunning && pathSegments.length > 0) {
+    const elapsed = (Date.now() - animationStartTime) / 1000;
+    robotPose = getRobotPoseAtTime(elapsed) || startPos;
+    
+    if (elapsed >= totalPathTime) {
+      stopAnimation();
+    }
+  }
+  
+  if (robotPose) {
+    const pos = pedroToCanvas(robotPose.x, robotPose.y);
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(-robotPose.heading);
+    
+    // Robot size: 18" x 18" in field coordinates
+    const robotSizeInches = 18;
+    const robotSizePixels = robotSizeInches * (FIELD_SIZE / (FIELD_HALF * 2));
+    
+    if (robotImageLoaded) {
+      ctx.drawImage(robotImage, -robotSizePixels/2, -robotSizePixels/2, robotSizePixels, robotSizePixels);
+    } else {
+      // Fallback robot (18" x 18")
+      const halfSize = robotSizePixels / 2;
+      ctx.fillStyle = 'rgba(67, 170, 139, 0.8)';
+      ctx.fillRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
+      
+      // Direction indicator
+      ctx.fillStyle = '#f9c74f';
+      ctx.beginPath();
+      ctx.moveTo(0, -halfSize);
+      ctx.lineTo(-halfSize * 0.4, -halfSize * 1.3);
+      ctx.lineTo(halfSize * 0.4, -halfSize * 1.3);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    ctx.restore();
+  }
 }
 
-// Utility to dynamically load a script
+// Animation controls
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (pathSegments.length === 0) return;
+  
+  if (animationRunning) {
+    stopAnimation();
+  } else {
+    startAnimation();
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  stopAnimation();
+  renderField();
+});
+
+function startAnimation() {
+  animationRunning = true;
+  animationStartTime = Date.now();
+  document.getElementById('playBtn').textContent = '⏸️ Pause';
+  animate();
+}
+
+function stopAnimation() {
+  animationRunning = false;
+  document.getElementById('playBtn').textContent = '▶️ Play';
+}
+
+function animate() {
+  if (!animationRunning) return;
+  
+  renderField();
+  requestAnimationFrame(animate);
+}
+
+// Utility functions
 function loadScript(url) {
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -476,7 +678,6 @@ function loadScript(url) {
   });
 }
 
-// Ensure kjua is available
 async function ensureKjua() {
   if (typeof kjua === 'function') return;
   const sources = [
@@ -594,11 +795,12 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   localStorage.removeItem('last_qr_payload');
   document.getElementById('qr').innerHTML = '';
   document.getElementById('info').textContent = '';
+  stopAnimation();
   ensureStartBlock();
   updateVisualization();
 });
 
-// Generate plan JSON (same as before)
+// Generate plan JSON - returns array of objects
 function generatePlanJSON() {
   const startBlock = workspace.getTopBlocks(true).find(b => b.type === 'start');
   if (!startBlock) return [];
@@ -620,10 +822,9 @@ function generatePlanJSON() {
         let code = genFn(current);
         if (Array.isArray(code)) code = code[0];
         if (code && code !== 'undefined') {
-          // Parse the JSON string to get the actual object
           try {
             const obj = JSON.parse(code);
-            plan.push(obj);  // ← NOW pushing the object, not the string
+            plan.push(obj);
           } catch (parseErr) {
             console.warn('Failed to parse JSON for', current.type, ':', code);
             plan.push({cmd: current.type, error: 'parse_failed'});

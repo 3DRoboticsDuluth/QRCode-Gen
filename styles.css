@@ -103,11 +103,33 @@ canvas {
   object-fit: contain;
 }
 
-#path-info {
+#animation-controls {
   background: #252526;
   border-top: 1px solid #3e3e42;
+  border-bottom: 1px solid #3e3e42;
   padding: 10px 15px;
-  max-height: 150px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#timer-display {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #43aa8b;
+  padding: 6px 12px;
+  background: #2d2d30;
+  border-radius: 3px;
+  min-width: 200px;
+  text-align: center;
+}
+
+#path-info {
+  background: #252526;
+  padding: 10px 15px;
+  max-height: 120px;
   overflow-y: auto;
 }
 
@@ -144,6 +166,22 @@ button, select {
 
 button:hover {
   background: #388e75;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+#playBtn {
+  min-width: 100px;
+}
+
+#resetBtn {
+  background: #577590;
+}
+
+#resetBtn:hover {
+  background: #465a72;
 }
 
 select {
@@ -198,7 +236,7 @@ select {
   }
   
   #blocklyDiv {
-    height: 30vh;
+    height: 25vh;
   }
   
   #blockly-output {
@@ -218,8 +256,17 @@ select {
     padding: 5px;
   }
   
+  #animation-controls {
+    padding: 8px 10px;
+  }
+  
+  #timer-display {
+    min-width: 150px;
+    font-size: 0.85rem;
+  }
+  
   #path-info {
-    max-height: 100px;
+    max-height: 80px;
     padding: 8px 10px;
   }
 }
@@ -235,7 +282,7 @@ select {
   }
   
   #blocklyDiv {
-    height: 25vh;
+    height: 20vh;
   }
   
   #qr svg, #qr img {
@@ -245,5 +292,15 @@ select {
   
   .waypoint-item {
     font-size: 0.75rem;
+  }
+  
+  #timer-display {
+    min-width: 120px;
+    font-size: 0.75rem;
+    padding: 5px 8px;
+  }
+  
+  #animation-controls {
+    gap: 6px;
   }
 }
