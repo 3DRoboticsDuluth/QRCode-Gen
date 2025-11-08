@@ -237,17 +237,30 @@ function calculatePathSegments() {
   updateTimerDisplay();
 }
 
-// Get robot pose at a given time
+// Get robot pose at a given time with smooth acceleration curves
 function getRobotPoseAtTime(time) {
   if (pathSegments.length === 0) return null;
   
   for (const seg of pathSegments) {
     if (time >= seg.startTime && time < seg.startTime + seg.duration) {
-      const t = (time - seg.startTime) / seg.duration;
+      const elapsed = time - seg.startTime;
       
+      // Action segments stay still
       if (seg.type === 'action') {
         return { ...seg.startPose };
       }
+      
+      // Movement segments use acceleration profile
+      const distance = Math.sqrt(
+        (seg.endPose.x - seg.startPose.x) ** 2 + 
+        (seg.endPose.y - seg.startPose.y) ** 2
+      );
+      
+      // Simple ease-in-out cubic for smooth acceleration
+      let t = elapsed / seg.duration;
+      t = t < 0.5 
+        ? 4 * t * t * t 
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
       
       // Interpolate position
       const x = seg.startPose.x + (seg.endPose.x - seg.startPose.x) * t;
