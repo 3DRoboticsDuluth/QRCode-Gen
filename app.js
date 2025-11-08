@@ -23,9 +23,31 @@ const PEDRO_CONSTANTS = {
   releaseGateTime: 1.0
 };
 
-// Initialize Blockly workspace
+// Define a new custom theme
+const myTheme = Blockly.Theme.defineTheme('customTheme', {
+  base: Blockly.Themes.Classic,
+  blockStyles: {},       // optional: for blocks
+  categoryStyles: {
+    start_category: {     // your category names from XML
+      colour: '#f9c74f',
+      labelColour: '#000000', // <-- text color for this category
+    },
+    actions_category: {
+      colour: '#5C68A6',
+      labelColour: '#000000',
+    }
+  },
+  componentStyles: {
+    workspaceBackgroundColour: '#ffffff',
+    toolboxBackgroundColour: '#f4f4f4',
+    toolboxForegroundColour: '#000000', // toolbox text color (for search bar / headers)
+  }
+});
+
+// Inject workspace with theme
 const workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
+  theme: myTheme,
   trashcan: true,
   scrollbars: true,
   zoom: { controls: true, wheel: true, startScale: 0.9 }
