@@ -6,17 +6,14 @@ body {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  /* Prevent touch behaviors that interfere with UI */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Prevent zoom on inputs */
 input, select, textarea {
   font-size: 16px !important;
 }
 
-/* LEFT PANEL - Blockly */
 #left-panel {
   width: 50%;
   display: flex;
@@ -52,7 +49,6 @@ input, select, textarea {
   height: 50vh;
   width: 100%;
   background: #fff;
-  /* Enable touch scrolling in Blockly */
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -70,7 +66,6 @@ input, select, textarea {
   justify-content: center;
 }
 
-/* RIGHT PANEL - Path Visualizer */
 #right-panel {
   width: 50%;
   display: flex;
@@ -110,7 +105,6 @@ input, select, textarea {
   justify-content: center;
   padding: 10px;
   overflow: hidden;
-  /* Prevent canvas touch interference */
   touch-action: none;
 }
 
@@ -120,7 +114,6 @@ canvas {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  /* Prevent default touch behaviors */
   touch-action: none;
 }
 
@@ -173,7 +166,6 @@ canvas {
   border-radius: 3px;
 }
 
-/* Buttons and Controls */
 button, select {
   padding: 8px 12px;
   background: #43aa8b;
@@ -181,10 +173,9 @@ button, select {
   border: none;
   border-radius: 3px;
   cursor: pointer;
-  font-size: 16px; /* Minimum 16px to prevent zoom on iOS */
+  font-size: 16px;
   font-weight: 600;
   transition: background 0.2s;
-  /* Better touch targets */
   min-height: 44px;
   min-width: 44px;
 }
@@ -229,8 +220,8 @@ select {
 }
 
 #qr svg, #qr img {
-  max-width: 250px;
-  max-height: 250px;
+  max-width: 100%;
+  max-height: 100%;
   width: 100%;
   height: auto;
   display: block;
@@ -250,7 +241,6 @@ select {
   margin-top: 4px;
 }
 
-/* Tablet adjustments (portrait) */
 @media (max-width: 1024px) and (orientation: portrait) {
   body { 
     flex-direction: column; 
@@ -276,7 +266,6 @@ select {
   }
 }
 
-/* Mobile adjustments */
 @media (max-width: 768px) {
   body { 
     flex-direction: column; 
@@ -303,11 +292,6 @@ select {
   #blockly-header h1 img {
     width: 120px;
     height: auto;
-  }
-  
-  #qr svg, #qr img {
-    max-width: 200px;
-    max-height: 200px;
   }
   
   #path-header h2 {
@@ -345,7 +329,6 @@ select {
   }
 }
 
-/* Small mobile adjustments */
 @media (max-width: 480px) {
   #blockly-header h1 {
     font-size: 0.9rem;
@@ -372,11 +355,6 @@ select {
   
   #blocklyDiv {
     height: 22vh;
-  }
-  
-  #qr svg, #qr img {
-    max-width: 180px;
-    max-height: 180px;
   }
   
   .waypoint-item {
@@ -409,7 +387,6 @@ select {
   }
 }
 
-/* Landscape mobile optimization */
 @media (max-width: 932px) and (orientation: landscape) {
   body {
     flex-direction: row;

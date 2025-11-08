@@ -11,7 +11,9 @@ if (Blockly && Blockly.Workspace && typeof Blockly.Workspace.prototype.getAllVar
   } catch (e) { }
 }
 
+// ============================================================================
 // MOBILE OPTIMIZATIONS
+// ============================================================================
 
 // Better localStorage error handling for mobile browsers
 function safeLocalStorageSet(key, value) {
@@ -56,7 +58,9 @@ document.addEventListener('gestureend', function(e) {
   e.preventDefault();
 });
 
+// ============================================================================
 // PEDRO PATHING CONSTANTS
+// ============================================================================
 
 const PEDRO_CONSTANTS = {
   xMovementVelocity: 30,
@@ -67,7 +71,9 @@ const PEDRO_CONSTANTS = {
   releaseGateTime: 1.0
 };
 
+// ============================================================================
 // BLOCKLY WORKSPACE SETUP
+// ============================================================================
 
 const myTheme = Blockly.Theme.defineTheme('customTheme', {
   base: Blockly.Themes.Classic,
@@ -110,7 +116,9 @@ function optimizeBlocklyForMobile() {
 
 optimizeBlocklyForMobile();
 
+// ============================================================================
 // CANVAS SETUP
+// ============================================================================
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -184,7 +192,9 @@ robotImage.onerror = function() {
 };
 robotImage.src = 'robot.png';
 
+// ============================================================================
 // START POSITIONS AND NAMED POSES
+// ============================================================================
 
 const START_POSITIONS = {
   RED_NORTH: { 
@@ -263,7 +273,9 @@ function pedroToCanvas(x, y) {
   };
 }
 
+// ============================================================================
 // PATH TIMING CALCULATIONS
+// ============================================================================
 
 function calculateMoveTime(from, to) {
   const dx = to.x - from.x;
@@ -379,7 +391,9 @@ function getRobotPoseAtTime(time) {
   return { ...startPos };
 }
 
+// ============================================================================
 // BLOCK MANAGEMENT
+// ============================================================================
 
 function ensureStartBlock() {
   if (!workspace.getAllBlocks(false).some(b => b.type === 'start')) {
@@ -550,6 +564,10 @@ function extractPathFromBlocks() {
   return path;
 }
 
+// ============================================================================
+// UI UPDATES
+// ============================================================================
+
 function updateWaypointsList() {
   const list = document.getElementById('waypoints-list');
   
@@ -598,6 +616,10 @@ function updateTimerDisplay() {
     timerEl.style.color = remaining < 5 ? '#f9c74f' : '#43aa8b';
   }
 }
+
+// ============================================================================
+// FIELD RENDERING
+// ============================================================================
 
 function renderField() {
   ctx.clearRect(0, 0, FIELD_SIZE, FIELD_SIZE);
@@ -730,6 +752,10 @@ function renderField() {
   }
 }
 
+// ============================================================================
+// ANIMATION CONTROLS
+// ============================================================================
+
 document.getElementById('playBtn').addEventListener('click', () => {
   if (pathSegments.length === 0) return;
   
@@ -764,7 +790,9 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
+// ============================================================================
 // UTILITY FUNCTIONS
+// ============================================================================
 
 function loadScript(url) {
   return new Promise((resolve, reject) => {
@@ -795,7 +823,9 @@ async function ensureKjua() {
   throw new Error('kjua library could not be loaded from any CDN');
 }
 
+// ============================================================================
 // QR GENERATION
+// ============================================================================
 
 document.getElementById('generateBtn').addEventListener('click', async () => {
   const plan = generatePlanJSON();
@@ -810,23 +840,61 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   const qrContainer = document.getElementById('qr');
   qrContainer.innerHTML = '';
 
+  // On mobile, hide the right panel and show QR in full screen
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    const rightPanel = document.getElementById('right-panel');
+    rightPanel.style.display = 'none';
+    
+    // Make left panel full screen
+    const leftPanel = document.getElementById('left-panel');
+    leftPanel.style.width = '100%';
+    leftPanel.style.height = '100vh';
+    
+    // Expand blockly output to show large QR
+    const blocklyOutput = document.getElementById('blockly-output');
+    blocklyOutput.style.flex = '1';
+    blocklyOutput.style.justifyContent = 'center';
+    blocklyOutput.style.alignItems = 'center';
+  }
+
   try {
     await ensureKjua();
-    const qr = kjua({ render: 'svg', text: b64, size: 250, ecLevel: 'H' });
+    // Use larger size on mobile for better readability
+    const qrSize = isMobile ? Math.min(window.innerWidth - 40, 400) : 250;
+    const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
     qrContainer.appendChild(qr);
   } catch (e) {
     console.warn('kjua not available, trying image API', e);
-    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(b64);
+    const qrSize = isMobile ? Math.min(window.innerWidth - 40, 400) : 250;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=` + encodeURIComponent(b64);
     const img = document.createElement('img');
     img.alt = 'QR code';
     img.src = qrUrl;
     qrContainer.appendChild(img);
   }
 
+  // Add a "Back" button on mobile to return to normal view
+  if (isMobile) {
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Back to Editor';
+    backBtn.style.marginTop = '20px';
+    backBtn.onclick = () => {
+      document.getElementById('right-panel').style.display = '';
+      document.getElementById('left-panel').style.width = '';
+      document.getElementById('left-panel').style.height = '';
+      document.getElementById('blockly-output').style.flex = '';
+      backBtn.remove();
+    };
+    document.getElementById('blockly-output').appendChild(backBtn);
+  }
+
   safeLocalStorageSet('last_qr_payload', b64);
 });
 
+// ============================================================================
 // BUNDLE CREATION
+// ============================================================================
 
 document.getElementById('bundleBtn').addEventListener('click', async () => {
   const info = document.getElementById('info');
@@ -890,7 +958,9 @@ document.getElementById('bundleBtn').addEventListener('click', async () => {
   info.textContent = 'Bundle downloaded!';
 });
 
+// ============================================================================
 // CLEAR WORKSPACE
+// ============================================================================
 
 document.getElementById('clearBtn').addEventListener('click', () => {
   workspace.getAllBlocks(false).forEach(b => b.dispose(true));
@@ -902,7 +972,9 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   updateVisualization();
 });
 
+// ============================================================================
 // PLAN JSON GENERATION
+// ============================================================================
 
 function generatePlanJSON() {
   const startBlock = workspace.getTopBlocks(true).find(b => b.type === 'start');
@@ -955,7 +1027,9 @@ function compressAndEncode(plan) {
   return btoa(binary);
 }
 
+// ============================================================================
 // WINDOW RESIZE & ORIENTATION HANDLERS
+// ============================================================================
 
 let resizeTimeout;
 window.addEventListener('resize', () => {
@@ -979,7 +1053,9 @@ window.addEventListener('orientationchange', () => {
   }, 100);
 });
 
+// ============================================================================
 // TOUCH FEEDBACK FOR BUTTONS
+// ============================================================================
 
 function addTouchFeedback() {
   const buttons = document.querySelectorAll('button');
@@ -996,13 +1072,17 @@ function addTouchFeedback() {
 
 addTouchFeedback();
 
+// ============================================================================
 // SERVICE WORKER REGISTRATION
+// ============================================================================
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) { }
 }
 
+// ============================================================================
 // INITIAL SETUP
+// ============================================================================
 
 ensureStartBlock();
 updateVisualization();
