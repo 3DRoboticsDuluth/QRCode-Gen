@@ -491,10 +491,10 @@ function updateWaypointsList() {
   let currentPose = { ...startPos };
   
   currentPath.forEach((wp, idx) => {
-    let icon = '🚗';
-    if (wp.type === 'deposit') icon = '📦';
-    else if (wp.type === 'intake') icon = '⬇️';
-    else if (wp.type === 'action') icon = '⚙️';
+    let icon = '';
+    if (wp.type === 'deposit') icon = '';
+    else if (wp.type === 'intake') icon = '';
+    else if (wp.type === 'action') icon = '';
     
     const moveTime = calculateMoveTime(currentPose, wp);
     cumulativeTime += moveTime;
