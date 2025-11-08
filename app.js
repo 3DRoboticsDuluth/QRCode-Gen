@@ -11,26 +11,71 @@ if (Blockly && Blockly.Workspace && typeof Blockly.Workspace.prototype.getAllVar
   } catch (e) { }
 }
 
-// Pedro Pathing Constants (placeholder - can be tuned)
+// MOBILE OPTIMIZATIONS
+
+// Better localStorage error handling for mobile browsers
+function safeLocalStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    console.warn('localStorage not available:', e);
+    return false;
+  }
+}
+
+function safeLocalStorageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.warn('localStorage not available:', e);
+    return null;
+  }
+}
+
+function safeLocalStorageRemove(key) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch (e) {
+    console.warn('localStorage not available:', e);
+    return false;
+  }
+}
+
+// Prevent pinch zoom on iOS
+document.addEventListener('gesturestart', function(e) {
+  e.preventDefault();
+});
+
+document.addEventListener('gesturechange', function(e) {
+  e.preventDefault();
+});
+
+document.addEventListener('gestureend', function(e) {
+  e.preventDefault();
+});
+
+// PEDRO PATHING CONSTANTS
+
 const PEDRO_CONSTANTS = {
-  xMovementVelocity: 30, // inches/sec
+  xMovementVelocity: 30,
   yMovementVelocity: 30,
-  turnVelocity: 90, // degrees/sec (converted to rad/sec in calcs)
-  
-  // Action times (seconds)
+  turnVelocity: 90,
   intakeTime: 1.5,
   depositTime: 2.0,
   releaseGateTime: 1.0
 };
 
-// Define a new custom theme
+// BLOCKLY WORKSPACE SETUP
+
 const myTheme = Blockly.Theme.defineTheme('customTheme', {
   base: Blockly.Themes.Classic,
-  blockStyles: {},       // optional: for blocks
+  blockStyles: {},
   categoryStyles: {
-    start_category: {     // your category names from XML
+    start_category: {
       colour: '#f9c74f',
-      labelColour: '#000000', // <-- text color for this category
+      labelColour: '#000000',
     },
     actions_category: {
       colour: '#5C68A6',
@@ -40,11 +85,10 @@ const myTheme = Blockly.Theme.defineTheme('customTheme', {
   componentStyles: {
     workspaceBackgroundColour: '#ffffff',
     toolboxBackgroundColour: '#f4f4f4',
-    toolboxForegroundColour: '#000000', // toolbox text color (for search bar / headers)
+    toolboxForegroundColour: '#000000',
   }
 });
 
-// Inject workspace with theme
 const workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
   theme: myTheme,
@@ -53,12 +97,26 @@ const workspace = Blockly.inject('blocklyDiv', {
   zoom: { controls: true, wheel: true, startScale: 0.9 }
 });
 
-// Canvas setup for path visualization
+function optimizeBlocklyForMobile() {
+  if (workspace && workspace.options) {
+    workspace.options.horizontalLayout = false;
+    workspace.options.toolboxPosition = 'start';
+    
+    if (window.innerWidth <= 768) {
+      workspace.setScale(0.8);
+    }
+  }
+}
+
+optimizeBlocklyForMobile();
+
+// CANVAS SETUP
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const FIELD_SIZE = 600;
+let FIELD_SIZE = 600;
 const TILE_WIDTH = 23.5;
-const FIELD_HALF = 72; // inches
+const FIELD_HALF = 72;
 
 let fieldImage = new Image();
 let robotImage = new Image();
@@ -69,14 +127,43 @@ let startPos = null;
 let currentAlliance = 'RED';
 let currentSide = 'NORTH';
 
-// Animation state
 let animationRunning = false;
-let animationProgress = 0; // 0 to 1
+let animationProgress = 0;
 let animationStartTime = 0;
 let totalPathTime = 0;
-let pathSegments = []; // {start, end, duration, type}
+let pathSegments = [];
 
-// Load field image
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+function resizeCanvas() {
+  const container = document.getElementById('canvas-container');
+  
+  if (container && canvas) {
+    const containerWidth = container.clientWidth - 20;
+    const containerHeight = container.clientHeight - 20;
+    const size = Math.min(containerWidth, containerHeight, 600);
+    
+    if (size > 0 && size !== FIELD_SIZE) {
+      FIELD_SIZE = size;
+      canvas.width = size;
+      canvas.height = size;
+      renderField();
+    }
+  }
+}
+
+setTimeout(resizeCanvas, 100);
+
 fieldImage.onload = function() {
   imageLoaded = true;
   updateVisualization();
@@ -87,7 +174,6 @@ fieldImage.onerror = function() {
 };
 fieldImage.src = 'FTC Field.jpg';
 
-// Load robot image
 robotImage.onload = function() {
   robotImageLoaded = true;
   updateVisualization();
@@ -98,7 +184,8 @@ robotImage.onerror = function() {
 };
 robotImage.src = 'robot.png';
 
-// Start positions
+// START POSITIONS AND NAMED POSES
+
 const START_POSITIONS = {
   RED_NORTH: { 
     x: 2 * TILE_WIDTH,
@@ -122,7 +209,6 @@ const START_POSITIONS = {
   }
 };
 
-// Named poses from NavSubsystem with alliance sign logic
 function getAllianceSign() {
   return currentAlliance === 'RED' ? -1 : 1;
 }
@@ -170,7 +256,6 @@ const NAMED_POSES = {
   })
 };
 
-// Convert Pedro coordinates to canvas pixels
 function pedroToCanvas(x, y) {
   return {
     x: (x + FIELD_HALF) * (FIELD_SIZE / (FIELD_HALF * 2)),
@@ -178,32 +263,28 @@ function pedroToCanvas(x, y) {
   };
 }
 
-// Calculate time to move between two poses
+// PATH TIMING CALCULATIONS
+
 function calculateMoveTime(from, to) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   
-  // Heading difference
   let dHeading = to.heading - from.heading;
   while (dHeading > Math.PI) dHeading -= 2 * Math.PI;
   while (dHeading < -Math.PI) dHeading += 2 * Math.PI;
   const turnAmount = Math.abs(dHeading) * 180 / Math.PI;
   
-  // Time for linear movement
   const linearTime = distance / Math.sqrt(
     PEDRO_CONSTANTS.xMovementVelocity ** 2 + 
     PEDRO_CONSTANTS.yMovementVelocity ** 2
   );
   
-  // Time for turn
   const turnTime = turnAmount / PEDRO_CONSTANTS.turnVelocity;
   
-  // Return max (simultaneous movement)
   return Math.max(linearTime, turnTime);
 }
 
-// Calculate path segments with timing
 function calculatePathSegments() {
   if (!startPos || currentPath.length === 0) {
     pathSegments = [];
@@ -216,7 +297,6 @@ function calculatePathSegments() {
   let cumulativeTime = 0;
   
   currentPath.forEach((wp, idx) => {
-    // Movement segment
     const moveTime = calculateMoveTime(currentPose, wp);
     segments.push({
       startPose: { ...currentPose },
@@ -228,7 +308,6 @@ function calculatePathSegments() {
     });
     cumulativeTime += moveTime;
     
-    // Action segment
     let actionTime = 0;
     if (wp.type === 'intake') {
       actionTime = PEDRO_CONSTANTS.intakeTime;
@@ -259,7 +338,6 @@ function calculatePathSegments() {
   updateTimerDisplay();
 }
 
-// Get robot pose at a given time with smooth acceleration curves
 function getRobotPoseAtTime(time) {
   if (pathSegments.length === 0) return null;
   
@@ -267,28 +345,23 @@ function getRobotPoseAtTime(time) {
     if (time >= seg.startTime && time < seg.startTime + seg.duration) {
       const elapsed = time - seg.startTime;
       
-      // Action segments stay still
       if (seg.type === 'action') {
         return { ...seg.startPose };
       }
       
-      // Movement segments use acceleration profile
       const distance = Math.sqrt(
         (seg.endPose.x - seg.startPose.x) ** 2 + 
         (seg.endPose.y - seg.startPose.y) ** 2
       );
       
-      // Simple ease-in-out cubic for smooth acceleration
       let t = elapsed / seg.duration;
       t = t < 0.5 
         ? 4 * t * t * t 
         : 1 - Math.pow(-2 * t + 2, 3) / 2;
       
-      // Interpolate position
       const x = seg.startPose.x + (seg.endPose.x - seg.startPose.x) * t;
       const y = seg.startPose.y + (seg.endPose.y - seg.startPose.y) * t;
       
-      // Interpolate heading
       let dh = seg.endPose.heading - seg.startPose.heading;
       while (dh > Math.PI) dh -= 2 * Math.PI;
       while (dh < -Math.PI) dh += 2 * Math.PI;
@@ -298,7 +371,6 @@ function getRobotPoseAtTime(time) {
     }
   }
   
-  // Past end of path
   if (time >= totalPathTime && pathSegments.length > 0) {
     const lastSeg = pathSegments[pathSegments.length - 1];
     return { ...lastSeg.endPose };
@@ -307,7 +379,8 @@ function getRobotPoseAtTime(time) {
   return { ...startPos };
 }
 
-// Ensure Start block exists
+// BLOCK MANAGEMENT
+
 function ensureStartBlock() {
   if (!workspace.getAllBlocks(false).some(b => b.type === 'start')) {
     const startBlock = workspace.newBlock('start');
@@ -318,7 +391,6 @@ function ensureStartBlock() {
   }
 }
 
-// Update visualization when blocks or alliance changes
 workspace.addChangeListener(() => {
   ensureStartBlock();
   updateVisualization();
@@ -506,7 +578,6 @@ function updateWaypointsList() {
     
     cumulativeTime += actionTime;
     
-    const heading = Math.round(wp.heading * 180 / Math.PI);
     html += `<div class="waypoint-item">${idx + 1}. ${icon} ${wp.label} @ ${cumulativeTime.toFixed(1)}s</div>`;
     
     currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
@@ -531,7 +602,6 @@ function updateTimerDisplay() {
 function renderField() {
   ctx.clearRect(0, 0, FIELD_SIZE, FIELD_SIZE);
 
-  // Draw field background
   if (imageLoaded) {
     ctx.save();
     ctx.translate(FIELD_SIZE / 2, FIELD_SIZE / 2);
@@ -565,7 +635,6 @@ function renderField() {
     ctx.restore();
   }
 
-  // Draw path
   if (currentPath.length > 0 && startPos) {
     ctx.strokeStyle = 'rgba(249, 199, 79, 0.6)';
     ctx.lineWidth = 3;
@@ -582,7 +651,6 @@ function renderField() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw waypoints
     currentPath.forEach((wp, idx) => {
       const pos = pedroToCanvas(wp.x, wp.y);
       
@@ -620,7 +688,6 @@ function renderField() {
     });
   }
 
-  // Draw robot
   let robotPose = startPos;
   if (animationRunning && pathSegments.length > 0) {
     const elapsed = (Date.now() - animationStartTime) / 1000;
@@ -637,14 +704,12 @@ function renderField() {
     ctx.translate(pos.x, pos.y);
     ctx.rotate(-robotPose.heading);
     
-    // Robot size: 18" x 18" in field coordinates
     const robotSizeInches = 18;
     const robotSizePixels = robotSizeInches * (FIELD_SIZE / (FIELD_HALF * 2));
     
     if (robotImageLoaded) {
       ctx.drawImage(robotImage, -robotSizePixels/2, -robotSizePixels/2, robotSizePixels, robotSizePixels);
     } else {
-      // Fallback robot (18" x 18")
       const halfSize = robotSizePixels / 2;
       ctx.fillStyle = 'rgba(67, 170, 139, 0.8)';
       ctx.fillRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
@@ -652,7 +717,6 @@ function renderField() {
       ctx.lineWidth = 2;
       ctx.strokeRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
       
-      // Direction indicator
       ctx.fillStyle = '#f9c74f';
       ctx.beginPath();
       ctx.moveTo(0, -halfSize);
@@ -666,7 +730,6 @@ function renderField() {
   }
 }
 
-// Animation controls
 document.getElementById('playBtn').addEventListener('click', () => {
   if (pathSegments.length === 0) return;
   
@@ -701,7 +764,8 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
-// Utility functions
+// UTILITY FUNCTIONS
+
 function loadScript(url) {
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -731,7 +795,8 @@ async function ensureKjua() {
   throw new Error('kjua library could not be loaded from any CDN');
 }
 
-// Generate QR
+// QR GENERATION
+
 document.getElementById('generateBtn').addEventListener('click', async () => {
   const plan = generatePlanJSON();
   if (!plan.length) {
@@ -758,10 +823,11 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     qrContainer.appendChild(img);
   }
 
-  localStorage.setItem('last_qr_payload', b64);
+  safeLocalStorageSet('last_qr_payload', b64);
 });
 
-// Bundle creation
+// BUNDLE CREATION
+
 document.getElementById('bundleBtn').addEventListener('click', async () => {
   const info = document.getElementById('info');
   info.textContent = 'Building bundle...';
@@ -824,10 +890,11 @@ document.getElementById('bundleBtn').addEventListener('click', async () => {
   info.textContent = 'Bundle downloaded!';
 });
 
-// Clear workspace
+// CLEAR WORKSPACE
+
 document.getElementById('clearBtn').addEventListener('click', () => {
   workspace.getAllBlocks(false).forEach(b => b.dispose(true));
-  localStorage.removeItem('last_qr_payload');
+  safeLocalStorageRemove('last_qr_payload');
   document.getElementById('qr').innerHTML = '';
   document.getElementById('info').textContent = '';
   stopAnimation();
@@ -835,7 +902,8 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   updateVisualization();
 });
 
-// Generate plan JSON - returns array of objects
+// PLAN JSON GENERATION
+
 function generatePlanJSON() {
   const startBlock = workspace.getTopBlocks(true).find(b => b.type === 'start');
   if (!startBlock) return [];
@@ -879,7 +947,6 @@ function generatePlanJSON() {
   return plan;
 }
 
-// Compress and encode
 function compressAndEncode(plan) {
   const json = JSON.stringify(plan);
   const gzip = pako.gzip(json);
@@ -888,11 +955,54 @@ function compressAndEncode(plan) {
   return btoa(binary);
 }
 
-// Service worker
+// WINDOW RESIZE & ORIENTATION HANDLERS
+
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    if (workspace) {
+      Blockly.svgResize(workspace);
+      optimizeBlocklyForMobile();
+      resizeCanvas();
+    }
+  }, 250);
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    resizeCanvas();
+    if (workspace) {
+      Blockly.svgResize(workspace);
+      optimizeBlocklyForMobile();
+    }
+  }, 100);
+});
+
+// TOUCH FEEDBACK FOR BUTTONS
+
+function addTouchFeedback() {
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach(btn => {
+    btn.addEventListener('touchstart', function() {
+      this.style.opacity = '0.7';
+    }, { passive: true });
+    
+    btn.addEventListener('touchend', function() {
+      this.style.opacity = '1';
+    }, { passive: true });
+  });
+}
+
+addTouchFeedback();
+
+// SERVICE WORKER REGISTRATION
+
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) { }
 }
 
-// Initial setup
+// INITIAL SETUP
+
 ensureStartBlock();
 updateVisualization();

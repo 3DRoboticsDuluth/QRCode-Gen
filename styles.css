@@ -6,6 +6,14 @@ body {
   display: flex;
   height: 100vh;
   overflow: hidden;
+  /* Prevent touch behaviors that interfere with UI */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent zoom on inputs */
+input, select, textarea {
+  font-size: 16px !important;
 }
 
 /* LEFT PANEL - Blockly */
@@ -29,6 +37,11 @@ body {
   margin: 0 0 8px 0;
 }
 
+#blockly-header h1 img {
+  max-width: 100%;
+  height: auto;
+}
+
 #blockly-controls {
   display: flex;
   gap: 6px;
@@ -39,6 +52,9 @@ body {
   height: 50vh;
   width: 100%;
   background: #fff;
+  /* Enable touch scrolling in Blockly */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #blockly-output {
@@ -46,6 +62,7 @@ body {
   background: #252526;
   padding: 10px 15px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border-top: 1px solid #3e3e42;
   display: flex;
   flex-direction: column;
@@ -93,6 +110,8 @@ body {
   justify-content: center;
   padding: 10px;
   overflow: hidden;
+  /* Prevent canvas touch interference */
+  touch-action: none;
 }
 
 canvas {
@@ -101,6 +120,8 @@ canvas {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  /* Prevent default touch behaviors */
+  touch-action: none;
 }
 
 #animation-controls {
@@ -131,6 +152,7 @@ canvas {
   padding: 10px 15px;
   max-height: 120px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #path-info h3 {
@@ -153,15 +175,18 @@ canvas {
 
 /* Buttons and Controls */
 button, select {
-  padding: 6px 10px;
+  padding: 8px 12px;
   background: #43aa8b;
   color: white;
   border: none;
   border-radius: 3px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 16px; /* Minimum 16px to prevent zoom on iOS */
   font-weight: 600;
   transition: background 0.2s;
+  /* Better touch targets */
+  min-height: 44px;
+  min-width: 44px;
 }
 
 button:hover {
@@ -170,6 +195,7 @@ button:hover {
 
 button:active {
   transform: scale(0.98);
+  background: #2d7360;
 }
 
 #playBtn {
@@ -184,11 +210,16 @@ button:active {
   background: #465a72;
 }
 
+#resetBtn:active {
+  background: #3a4a5c;
+}
+
 select {
   background: #3c3c3c;
   border: 1px solid #555;
-  padding: 5px 8px;
+  padding: 8px 12px;
   color: #e0e0e0;
+  min-height: 44px;
 }
 
 #qr {
@@ -219,8 +250,34 @@ select {
   margin-top: 4px;
 }
 
+/* Tablet adjustments (portrait) */
+@media (max-width: 1024px) and (orientation: portrait) {
+  body { 
+    flex-direction: column; 
+  }
+  
+  #left-panel, #right-panel { 
+    width: 100%; 
+    height: 50vh;
+  }
+  
+  #left-panel { 
+    border-right: none; 
+    border-bottom: 2px solid #3e3e42; 
+  }
+  
+  #blocklyDiv {
+    height: 30vh;
+  }
+  
+  #blockly-header h1 img {
+    width: 150px;
+    height: auto;
+  }
+}
+
 /* Mobile adjustments */
-@media (max-width: 1200px) {
+@media (max-width: 768px) {
   body { 
     flex-direction: column; 
   }
@@ -243,6 +300,11 @@ select {
     padding: 8px 10px;
   }
   
+  #blockly-header h1 img {
+    width: 120px;
+    height: auto;
+  }
+  
   #qr svg, #qr img {
     max-width: 200px;
     max-height: 200px;
@@ -256,33 +318,60 @@ select {
     padding: 5px;
   }
   
+  canvas {
+    border-width: 1px;
+  }
+  
   #animation-controls {
     padding: 8px 10px;
+    gap: 6px;
   }
   
   #timer-display {
     min-width: 150px;
     font-size: 0.85rem;
+    padding: 6px 10px;
+    min-height: auto;
   }
   
   #path-info {
     max-height: 80px;
     padding: 8px 10px;
   }
+  
+  button, select {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
 }
 
-@media (max-width: 768px) {
-  #blockly-header h1, #path-header h2 {
-    font-size: 0.95rem;
+/* Small mobile adjustments */
+@media (max-width: 480px) {
+  #blockly-header h1 {
+    font-size: 0.9rem;
+  }
+  
+  #blockly-header h1 img {
+    width: 100px;
+    height: auto;
+  }
+  
+  #path-header h2 {
+    font-size: 0.9rem;
+  }
+  
+  #blockly-controls {
+    gap: 4px;
   }
   
   button, select {
-    font-size: 0.8rem;
-    padding: 5px 8px;
+    font-size: 13px;
+    padding: 10px 12px;
+    min-width: 40px;
   }
   
   #blocklyDiv {
-    height: 20vh;
+    height: 22vh;
   }
   
   #qr svg, #qr img {
@@ -292,15 +381,60 @@ select {
   
   .waypoint-item {
     font-size: 0.75rem;
+    padding: 3px 5px;
   }
   
   #timer-display {
-    min-width: 120px;
+    min-width: 130px;
     font-size: 0.75rem;
     padding: 5px 8px;
   }
   
   #animation-controls {
+    gap: 5px;
+    padding: 6px 8px;
+  }
+  
+  #start-controls {
     gap: 6px;
+  }
+  
+  #start-controls label {
+    font-size: 0.75rem;
+  }
+  
+  select {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 932px) and (orientation: landscape) {
+  body {
+    flex-direction: row;
+  }
+  
+  #left-panel, #right-panel {
+    width: 50%;
+    height: 100vh;
+  }
+  
+  #left-panel {
+    border-right: 2px solid #3e3e42;
+    border-bottom: none;
+  }
+  
+  #blocklyDiv {
+    height: 40vh;
+  }
+  
+  #blockly-header h1 img {
+    width: 100px;
+    height: auto;
+  }
+  
+  #path-info {
+    max-height: 60px;
   }
 }
