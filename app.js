@@ -840,54 +840,101 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   const qrContainer = document.getElementById('qr');
   qrContainer.innerHTML = '';
 
-  // On mobile, hide the right panel and show QR in full screen
-  const isMobile = window.innerWidth <= 768;
-  if (isMobile) {
-    const rightPanel = document.getElementById('right-panel');
-    rightPanel.style.display = 'none';
-    
-    // Make left panel full screen
-    const leftPanel = document.getElementById('left-panel');
-    leftPanel.style.width = '100%';
-    leftPanel.style.height = '100vh';
-    
-    // Expand blockly output to show large QR
-    const blocklyOutput = document.getElementById('blockly-output');
-    blocklyOutput.style.flex = '1';
-    blocklyOutput.style.justifyContent = 'center';
-    blocklyOutput.style.alignItems = 'center';
+  // Hide both panels and show QR in full screen (desktop and mobile)
+  const rightPanel = document.getElementById('right-panel');
+  const leftPanel = document.getElementById('left-panel');
+  
+  rightPanel.style.display = 'none';
+  leftPanel.style.display = 'none';
+  
+  // Create full-screen QR view
+  let qrView = document.getElementById('qr-fullscreen-view');
+  if (!qrView) {
+    qrView = document.createElement('div');
+    qrView.id = 'qr-fullscreen-view';
+    qrView.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #252526;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+      box-sizing: border-box;
+    `;
+    document.body.appendChild(qrView);
   }
+  
+  qrView.innerHTML = '';
+  qrView.style.display = 'flex';
+
+  // Add info text
+  const infoText = document.createElement('div');
+  infoText.textContent = `Steps: ${plan.length} | Size: ${b64.length} chars`;
+  infoText.style.cssText = `
+    color: #888;
+    font-size: 1rem;
+    margin-bottom: 20px;
+    text-align: center;
+  `;
+  qrView.appendChild(infoText);
+
+  // Add QR container
+  const qrWrapper = document.createElement('div');
+  qrWrapper.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    max-width: 90vw;
+    max-height: 70vh;
+  `;
+  qrView.appendChild(qrWrapper);
 
   try {
     await ensureKjua();
-    // Use larger size on mobile for better readability
-    const qrSize = isMobile ? Math.min(window.innerWidth - 40, 400) : 250;
+    // Use large size for both desktop and mobile
+    const qrSize = Math.min(window.innerWidth - 80, window.innerHeight - 200, 600);
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
-    qrContainer.appendChild(qr);
+    qr.style.cssText = 'max-width: 100%; max-height: 100%; width: auto; height: auto;';
+    qrWrapper.appendChild(qr);
   } catch (e) {
     console.warn('kjua not available, trying image API', e);
-    const qrSize = isMobile ? Math.min(window.innerWidth - 40, 400) : 250;
+    const qrSize = Math.min(window.innerWidth - 80, window.innerHeight - 200, 600);
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=` + encodeURIComponent(b64);
     const img = document.createElement('img');
     img.alt = 'QR code';
     img.src = qrUrl;
-    qrContainer.appendChild(img);
+    img.style.cssText = 'max-width: 100%; max-height: 100%; width: auto; height: auto;';
+    qrWrapper.appendChild(img);
   }
 
-  // Add a "Back" button on mobile to return to normal view
-  if (isMobile) {
-    const backBtn = document.createElement('button');
-    backBtn.textContent = '← Back to Editor';
-    backBtn.style.marginTop = '20px';
-    backBtn.onclick = () => {
-      document.getElementById('right-panel').style.display = '';
-      document.getElementById('left-panel').style.width = '';
-      document.getElementById('left-panel').style.height = '';
-      document.getElementById('blockly-output').style.flex = '';
-      backBtn.remove();
-    };
-    document.getElementById('blockly-output').appendChild(backBtn);
-  }
+  // Add back button
+  const backBtn = document.createElement('button');
+  backBtn.textContent = '← Back to Generator';
+  backBtn.style.cssText = `
+    margin-top: 30px;
+    padding: 12px 24px;
+    font-size: 16px;
+    background: #43aa8b;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 600;
+    min-height: 44px;
+  `;
+  backBtn.onclick = () => {
+    qrView.style.display = 'none';
+    rightPanel.style.display = '';
+    leftPanel.style.display = '';
+  };
+  qrView.appendChild(backBtn);
 
   safeLocalStorageSet('last_qr_payload', b64);
 });
