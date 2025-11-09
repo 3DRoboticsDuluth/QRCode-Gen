@@ -270,7 +270,7 @@ function getAllianceSign() {
 const NAMED_POSES = {
   spike_near: () => {
     // getSpike1() - nearest spike mark
-    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       1.5 * TILE_WIDTH,
       getAllianceSign() * -1.5 * TILE_WIDTH,
@@ -281,7 +281,7 @@ const NAMED_POSES = {
   },
   spike_middle: () => {
     // getSpike2() - middle spike mark
-    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       0.5 * TILE_WIDTH,
       getAllianceSign() * -1.5 * TILE_WIDTH,
@@ -292,7 +292,7 @@ const NAMED_POSES = {
   },
   spike_far: () => {
     // getSpike3() - farthest spike mark
-    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       -0.5 * TILE_WIDTH,
       getAllianceSign() * -1.5 * TILE_WIDTH,
@@ -303,7 +303,7 @@ const NAMED_POSES = {
   },
   loading_zone: () => {
     // getSpike0() - loading zone position
-    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       2.5 * TILE_WIDTH,
       getAllianceSign() * -2.5 * TILE_WIDTH,
@@ -314,7 +314,7 @@ const NAMED_POSES = {
   },
   launch_near: () => {
     // getLaunchNearPose()
-    const heading = getAllianceSign() * 220 * Math.PI / 180;
+    const heading = getAllianceSign() * 45 * Math.PI / 180;
     return applyOffsets(
       -0.5 * TILE_WIDTH,
       getAllianceSign() * -0.5 * TILE_WIDTH,
@@ -325,7 +325,7 @@ const NAMED_POSES = {
   },
   launch_far: () => {
     // getLaunchFarPose()
-    const heading = getAllianceSign() * 201 * Math.PI / 180;
+    const heading = getAllianceSign() * 20 * Math.PI / 180;
     return applyOffsets(
       2.5 * TILE_WIDTH,
       getAllianceSign() * -0.5 * TILE_WIDTH,
@@ -336,7 +336,7 @@ const NAMED_POSES = {
   },
   gate: () => {
     // getGatePose()
-    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       0 * TILE_WIDTH,
       getAllianceSign() * -2 * TILE_WIDTH,
@@ -538,22 +538,13 @@ function extractPathFromBlocks() {
     let waypoint = null;
     
     if (current.type === 'drive_to') {
-      const mode = current.getFieldValue('mode');
-      let x, y, heading;
+      const tx = Number(current.getFieldValue('tx')) || 0;
+      const ty = Number(current.getFieldValue('ty')) || 0;
+      const h = (Number(current.getFieldValue('h')) || 0) * Math.PI / 180;
+      const x = tx * TILE_WIDTH;
+      const y = ty * TILE_WIDTH;
       
-      if (mode === 'tiles') {
-        const tileX = Number(current.getFieldValue('tile_x')) || 0;
-        const tileY = Number(current.getFieldValue('tile_y')) || 0;
-        x = tileX * TILE_WIDTH;
-        y = tileY * TILE_WIDTH;
-        heading = (Number(current.getFieldValue('heading_tiles')) || 0) * Math.PI / 180;
-      } else {
-        x = Number(current.getFieldValue('x')) || 0;
-        y = Number(current.getFieldValue('y')) || 0;
-        heading = (Number(current.getFieldValue('heading_coords')) || 0) * Math.PI / 180;
-      }
-      
-      waypoint = { x, y, heading, type: 'drive', label: 'Drive' };
+      waypoint = { x, y, heading: h, type: 'drive', label: 'Drive' };
     }
     
     else if (current.type === 'deposit') {
