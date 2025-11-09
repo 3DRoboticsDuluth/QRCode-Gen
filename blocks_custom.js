@@ -60,11 +60,11 @@ Blockly.Blocks['drive_to'] = {
       .appendField(new Blockly.FieldNumber(0,0,360), "heading_coords");
     // Tiles input group (only visible when mode == tiles)
     this.appendDummyInput('TILES')
-      .appendField("tile_x:")
+      .appendField("tx:")
       .appendField(new Blockly.FieldNumber(0), "tile_x")
-      .appendField("tile_y:")
+      .appendField("ty:")
       .appendField(new Blockly.FieldNumber(0), "tile_y")
-      .appendField("heading:")
+      .appendField("h:")
       .appendField(new Blockly.FieldNumber(0,0,360), "heading_tiles");
     // default visibility: show COORDS, hide TILES
     this.getInput('COORDS').setVisible(true);
@@ -77,15 +77,15 @@ Blockly.Blocks['drive_to'] = {
 Blockly.JavaScript['drive_to'] = function(block){
   const mode = block.getFieldValue('mode');
   if (mode === 'tiles') {
-    const tile_x = Number(block.getFieldValue('tile_x'))||0;
-    const tile_y = Number(block.getFieldValue('tile_y'))||0;
-    const heading = Number(block.getFieldValue('heading_tiles'))||0;
-    return JSON.stringify({cmd:'drive_to', tile_x, tile_y, heading, use_tiles:true});
+    const tx = Number(block.getFieldValue('tile_x'))||0;
+    const ty = Number(block.getFieldValue('tile_y'))||0;
+    const h = Number(block.getFieldValue('heading_tiles'))||0;
+    return JSON.stringify({cmd:'drive', tx, ty, h});
   } else {
     const x = Number(block.getFieldValue('x'))||0;
     const y = Number(block.getFieldValue('y'))||0;
-    const heading = Number(block.getFieldValue('heading_coords'))||0;
-    return JSON.stringify({cmd:'drive_to', x, y, heading});
+    const h = Number(block.getFieldValue('heading_coords'))||0;
+    return JSON.stringify({cmd:'drive', x, y, h});
   }
 };
 
@@ -102,23 +102,28 @@ Blockly.Blocks['drive_to'].onchange = function(event) {
   } catch (e) { /* ignore when removed */ }
 };
 
-// INTAKE ROW (1-3)
+// INTAKE ROW (0-3, where 0 = human)
 Blockly.Blocks['intake_row'] = {
   init: function() {
     this.appendDummyInput()
-      .appendField("Intake row")
-      .appendField(new Blockly.FieldNumber(1,0,3,1),"row");
+      .appendField("Intake")
+      .appendField(new Blockly.FieldDropdown([
+        ["Human (0)","0"],
+        ["Spike 1","1"],
+        ["Spike 2","2"],
+        ["Spike 3","3"]
+      ]),"spike");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour("#577590");
   }
 };
 Blockly.JavaScript['intake_row'] = function(block){
-  const row = Number(block.getFieldValue('row'))||1;
-  return JSON.stringify({cmd:'intake_row', row});
+  const spike = Number(block.getFieldValue('spike'))||0;
+  return JSON.stringify({cmd:'intake', spike});
 };
 
-// INTAKE HUMAN (shortcut for row 0)
+// INTAKE HUMAN (shortcut for spike 0)
 Blockly.Blocks['intake_human'] = {
   init: function() {
     this.appendDummyInput().appendField("Intake Human");
@@ -128,29 +133,36 @@ Blockly.Blocks['intake_human'] = {
   }
 };
 Blockly.JavaScript['intake_human'] = function(block){
-  return JSON.stringify({cmd:'intake_row', row:0});
+  return JSON.stringify({cmd:'intake', spike:0});
 };
 
-// DEPOSIT (near/far) with sortedY boolean
-Blockly.Blocks['deposit_near_far'] = {
+// DEPOSIT (unified block with locale and optional offsets)
+Blockly.Blocks['deposit'] = {
   init: function(){
     this.appendDummyInput()
       .appendField("Deposit")
-      .appendField(new Blockly.FieldDropdown([["Near","near"],["Far","far"]]), "where")
+      .appendField(new Blockly.FieldDropdown([["Near","near"],["Far","far"]]), "locale")
       .appendField(" sorted?")
       .appendField(new Blockly.FieldDropdown([["No","false"],["Yes","true"]]), "sorted");
+    this.appendDummyInput()
+      .appendField("Offset txo:")
+      .appendField(new Blockly.FieldNumber(0), "txo")
+      .appendField("tyo:")
+      .appendField(new Blockly.FieldNumber(0), "tyo");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour("#277da1");
   }
 };
-Blockly.JavaScript['deposit_near_far'] = function(block){
-  const where = block.getFieldValue('where');
+Blockly.JavaScript['deposit'] = function(block){
+  const locale = block.getFieldValue('locale');
   const sorted = block.getFieldValue('sorted') === 'true';
-  return JSON.stringify({cmd:'deposit', mode: where, sorted});
+  const txo = Number(block.getFieldValue('txo'))||0;
+  const tyo = Number(block.getFieldValue('tyo'))||0;
+  return JSON.stringify({cmd:'deposit', locale, sorted, txo, tyo});
 };
 
-// DELAY (seconds) - generator emits ms to match decoder
+// DELAY (milliseconds in output to match decoder expecting "seconds" field in ms)
 Blockly.Blocks['delay_s'] = {
   init: function(){
     this.appendDummyInput()
@@ -164,8 +176,8 @@ Blockly.Blocks['delay_s'] = {
 };
 Blockly.JavaScript['delay_s'] = function(block){
   const s = Number(block.getFieldValue('s'))||0;
-  const ms = Math.round(s * 1000);
-  return JSON.stringify({cmd:'delay_ms', ms});
+  const seconds = Math.round(s);
+  return JSON.stringify({cmd:'delay', seconds});
 };
 
 // RELEASE GATE
@@ -178,39 +190,58 @@ Blockly.Blocks['release_gate'] = {
   }
 };
 Blockly.JavaScript['release_gate'] = function(block){
-  return JSON.stringify({cmd:'release_gate'});
+  return JSON.stringify({cmd:'release'});
 };
 
-// DEPOSIT AT TILE (tile coordinates + heading + sortedY)
+// DEPOSIT AT TILE (removed - now unified into single deposit block)
+// Keeping for backwards compatibility but this is deprecated
 Blockly.Blocks['deposit_tile'] = {
   init: function(){
     this.appendDummyInput()
-      .appendField("Deposit at tile_x:")
+      .appendField("⚠️ DEPRECATED - Use Deposit block")
+      .appendField("tx:")
       .appendField(new Blockly.FieldNumber(0),"tile_x")
-      .appendField("tile_y:")
-      .appendField(new Blockly.FieldNumber(0),"tile_y")
-      .appendField("heading:")
-      .appendField(new Blockly.FieldNumber(0,0,360),"heading");
+      .appendField("ty:")
+      .appendField(new Blockly.FieldNumber(0),"tile_y");
     this.appendDummyInput()
       .appendField(" sorted?")
       .appendField(new Blockly.FieldDropdown([["No","false"],["Yes","true"]]), "sorted");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
-    this.setColour("#277da1");
+    this.setColour("#888888");
   }
 };
 Blockly.JavaScript['deposit_tile'] = function(block){
-  const tile_x = Number(block.getFieldValue('tile_x'))||0;
-  const tile_y = Number(block.getFieldValue('tile_y'))||0;
-  const heading = Number(block.getFieldValue('heading'))||0;
+  const txo = Number(block.getFieldValue('tile_x'))||0;
+  const tyo = Number(block.getFieldValue('tile_y'))||0;
   const sorted = block.getFieldValue('sorted') === 'true';
-  return JSON.stringify({cmd:'deposit', tile_x, tile_y, heading, sorted});
+  // Default to "near" locale since this was tile-based positioning
+  return JSON.stringify({cmd:'deposit', locale:'near', sorted, txo, tyo});
+};
+
+// Also keep deposit_near_far for backwards compatibility
+Blockly.Blocks['deposit_near_far'] = {
+  init: function(){
+    this.appendDummyInput()
+      .appendField("⚠️ DEPRECATED - Use Deposit block")
+      .appendField(new Blockly.FieldDropdown([["Near","near"],["Far","far"]]), "where")
+      .appendField(" sorted?")
+      .appendField(new Blockly.FieldDropdown([["No","false"],["Yes","true"]]), "sorted");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour("#888888");
+  }
+};
+Blockly.JavaScript['deposit_near_far'] = function(block){
+  const locale = block.getFieldValue('where');
+  const sorted = block.getFieldValue('sorted') === 'true';
+  return JSON.stringify({cmd:'deposit', locale, sorted, txo:0, tyo:0});
 };
 
 // Debug: log which generators are present after definitions
 if (typeof console !== 'undefined' && Blockly && Blockly.JavaScript) {
   try {
-    const names = ['start','drive_to','intake_row','intake_human','delay_s','deposit_near_far','deposit_tile','release_gate'];
+    const names = ['start','drive_to','intake_row','intake_human','delay_s','deposit','deposit_near_far','deposit_tile','release_gate'];
     names.forEach(n => console.info('blocks_custom: generator present ->', n, typeof Blockly.JavaScript[n] === 'function'));
   } catch (e) { /* ignore */ }
 }

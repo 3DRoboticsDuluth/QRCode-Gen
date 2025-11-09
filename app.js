@@ -556,36 +556,32 @@ function extractPathFromBlocks() {
       waypoint = { x, y, heading, type: 'drive', label: 'Drive' };
     }
     
-    else if (current.type === 'deposit_tile') {
-      const tileX = Number(current.getFieldValue('tile_x')) || 0;
-      const tileY = Number(current.getFieldValue('tile_y')) || 0;
-      const heading = (Number(current.getFieldValue('heading')) || 0) * Math.PI / 180;
-      waypoint = { 
-        x: tileX * TILE_WIDTH, 
-        y: tileY * TILE_WIDTH, 
-        heading, 
-        type: 'deposit',
-        label: 'Deposit'
-      };
-    }
-    
-    else if (current.type === 'deposit_near_far') {
-      const where = current.getFieldValue('where');
-      const pose = where === 'near' ? NAMED_POSES.launch_near() : NAMED_POSES.launch_far();
+    else if (current.type === 'deposit') {
+      const locale = current.getFieldValue('locale');
+      const txo = Number(current.getFieldValue('txo')) || 0;
+      const tyo = Number(current.getFieldValue('tyo')) || 0;
+      
+      // Get base pose from locale
+      const pose = locale === 'near' ? NAMED_POSES.launch_near() : NAMED_POSES.launch_far();
+      
+      // Apply tile offsets
+      const x = pose.x + (txo * TILE_WIDTH);
+      const y = pose.y + (tyo * TILE_WIDTH);
+      
       waypoint = {
-        x: pose.x,
-        y: pose.y,
+        x: x,
+        y: y,
         heading: pose.heading,
         type: 'deposit',
-        label: `Deposit ${where}`
+        label: `Deposit ${locale}${txo || tyo ? ` (${txo},${tyo})` : ''}`
       };
     }
     
     else if (current.type === 'intake_row') {
-      const row = Number(current.getFieldValue('row')) || 0;
+      const spike = Number(current.getFieldValue('spike')) || 0;
       let pose;
       
-      if (row === 0) {
+      if (spike === 0) {
         pose = NAMED_POSES.loading_zone();
         waypoint = {
           x: pose.x,
@@ -594,7 +590,7 @@ function extractPathFromBlocks() {
           type: 'intake',
           label: 'Human Intake'
         };
-      } else if (row === 1) {
+      } else if (spike === 1) {
         pose = NAMED_POSES.spike_near();
         waypoint = {
           x: pose.x,
@@ -603,7 +599,7 @@ function extractPathFromBlocks() {
           type: 'intake',
           label: 'Intake Near'
         };
-      } else if (row === 2) {
+      } else if (spike === 2) {
         pose = NAMED_POSES.spike_middle();
         waypoint = {
           x: pose.x,
@@ -612,7 +608,7 @@ function extractPathFromBlocks() {
           type: 'intake',
           label: 'Intake Mid'
         };
-      } else if (row === 3) {
+      } else if (spike === 3) {
         pose = NAMED_POSES.spike_far();
         waypoint = {
           x: pose.x,
@@ -647,27 +643,27 @@ function extractPathFromBlocks() {
     }
     
     else if (current.type === 'delay') {
-  const delayTime = Number(current.getFieldValue('time')) || 0;
-  
-  // Get the last waypoint's position, or start position if no waypoints yet
-  let lastPose;
-  if (path.length > 0) {
-    const lastWp = path[path.length - 1];
-    lastPose = { x: lastWp.x, y: lastWp.y, heading: lastWp.heading };
-  } else {
-    lastPose = { ...startPos };
-  }
-  
-  // Create a waypoint at the same position with delay type
-  waypoint = {
-    x: lastPose.x,
-    y: lastPose.y,
-    heading: lastPose.heading,
-    type: 'delay',
-    delayTime: delayTime,
-    label: `Wait ${delayTime}s`
-  };
-}
+      const delayTime = Number(current.getFieldValue('time')) || 0;
+      
+      // Get the last waypoint's position, or start position if no waypoints yet
+      let lastPose;
+      if (path.length > 0) {
+        const lastWp = path[path.length - 1];
+        lastPose = { x: lastWp.x, y: lastWp.y, heading: lastWp.heading };
+      } else {
+        lastPose = { ...startPos };
+      }
+      
+      // Create a waypoint at the same position with delay type
+      waypoint = {
+        x: lastPose.x,
+        y: lastPose.y,
+        heading: lastPose.heading,
+        type: 'delay',
+        delayTime: delayTime,
+        label: `Wait ${delayTime}s`
+      };
+    }
     
     if (waypoint) {
       path.push(waypoint);
