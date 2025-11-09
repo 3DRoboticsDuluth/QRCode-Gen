@@ -68,8 +68,51 @@ const PEDRO_CONSTANTS = {
   turnVelocity: 90,
   intakeTime: 1.5,
   depositTime: 2.0,
-  releaseGateTime: 1.0
+  releaseGateTime: 1.0,
+  robotLength: 14,
+  robotWidth: 14
 };
+
+// ============================================================================
+// AXIAL AND LATERAL OFFSET SUPPORT
+// ============================================================================
+
+const Axial = {
+  FRONT: 1,
+  CENTER: 0,
+  BACK: -1
+};
+
+const Lateral = {
+  LEFT: 1,
+  CENTER: 0,
+  RIGHT: -1
+};
+
+function normalizeHeading(heading) {
+  while (heading > Math.PI) heading -= 2 * Math.PI;
+  while (heading < -Math.PI) heading += 2 * Math.PI;
+  return heading;
+}
+
+function applyOffsets(x, y, heading, axial = Axial.CENTER, lateral = Lateral.CENTER, axialOffset = 0, lateralOffset = 0) {
+  let newX = x;
+  let newY = y;
+  
+  // Apply axial offset (forward/backward relative to robot heading)
+  const axialHeading = normalizeHeading(heading);
+  const totalAxialOffset = axialOffset - (axial * PEDRO_CONSTANTS.robotLength / 2);
+  newX += Math.cos(axialHeading) * totalAxialOffset;
+  newY += Math.sin(axialHeading) * totalAxialOffset;
+  
+  // Apply lateral offset (left/right relative to robot heading)
+  const lateralHeading = normalizeHeading(heading + Math.PI / 2);
+  const totalLateralOffset = lateralOffset - (lateral * PEDRO_CONSTANTS.robotWidth / 2);
+  newX += Math.cos(lateralHeading) * totalLateralOffset;
+  newY += Math.sin(lateralHeading) * totalLateralOffset;
+  
+  return { x: newX, y: newY, heading };
+}
 
 // ============================================================================
 // BLOCKLY WORKSPACE SETUP
@@ -196,74 +239,123 @@ robotImage.src = 'robot.png';
 // START POSITIONS AND NAMED POSES
 // ============================================================================
 
-const START_POSITIONS = {
-  RED_NORTH: { 
-    x: 2 * TILE_WIDTH,
-    y: -1 * 2.75 * TILE_WIDTH,
-    heading: 0 
-  },
-  RED_SOUTH: { 
-    x: -3 * TILE_WIDTH,
-    y: -1 * 0.5 * TILE_WIDTH,
-    heading: 0 
-  },
-  BLUE_NORTH: { 
-    x: 2 * TILE_WIDTH,
-    y: 1 * 2.75 * TILE_WIDTH,
-    heading: 0 
-  },
-  BLUE_SOUTH: { 
-    x: -3 * TILE_WIDTH,
-    y: 1 * 0.5 * TILE_WIDTH,
-    heading: 0 
+function getStartPosition(alliance, side) {
+  const allianceSign = alliance === 'RED' ? -1 : 1;
+  
+  if (side === 'NORTH') {
+    // getStartNorthPose()
+    return applyOffsets(
+      3 * TILE_WIDTH,
+      allianceSign * -0.5 * TILE_WIDTH,
+      0, // heading: 0 degrees (facing +X)
+      Axial.FRONT,
+      Lateral.CENTER
+    );
+  } else {
+    // getStartSouthPose()
+    return applyOffsets(
+      -3 * TILE_WIDTH,
+      allianceSign * -1.5 * TILE_WIDTH,
+      0, // heading: 0 degrees (facing +X)
+      Axial.BACK,
+      Lateral.CENTER
+    );
   }
-};
+}
 
 function getAllianceSign() {
   return currentAlliance === 'RED' ? -1 : 1;
 }
 
 const NAMED_POSES = {
-  spike_near: () => ({
-    x: -1.5 * TILE_WIDTH,
-    y: getAllianceSign() * 1.5 * TILE_WIDTH,
-    heading: getAllianceSign() * 90 * Math.PI / 180
-  }),
-  spike_middle: () => ({
-    x: -0.5 * TILE_WIDTH,
-    y: getAllianceSign() * 1.5 * TILE_WIDTH,
-    heading: getAllianceSign() * 90 * Math.PI / 180
-  }),
-  spike_far: () => ({
-    x: 0.5 * TILE_WIDTH,
-    y: getAllianceSign() * 1.5 * TILE_WIDTH,
-    heading: getAllianceSign() * 90 * Math.PI / 180
-  }),
-  loading_zone: () => ({
-    x: -2.5 * TILE_WIDTH,
-    y: getAllianceSign() * -2.5 * TILE_WIDTH,
-    heading: getAllianceSign() * 90 * Math.PI / 180
-  }),
-  launch_near: () => ({
-    x: 0.5 * TILE_WIDTH,
-    y: getAllianceSign() * 0.5 * TILE_WIDTH,
-    heading: getAllianceSign() * 45 * Math.PI / 180
-  }),
-  launch_far: () => ({
-    x: -2.5 * TILE_WIDTH,
-    y: getAllianceSign() * -0.5 * TILE_WIDTH,
-    heading: getAllianceSign() * 30 * Math.PI / 180
-  }),
-  gate: () => ({
-    x: 0 * TILE_WIDTH,
-    y: getAllianceSign() * 2 * TILE_WIDTH,
-    heading: getAllianceSign() * -90 * Math.PI / 180
-  }),
-  base: () => ({
-    x: -2 * TILE_WIDTH,
-    y: getAllianceSign() * -1.4 * TILE_WIDTH,
-    heading: getAllianceSign() * 180 * Math.PI / 180
-  })
+  spike_near: () => {
+    // getSpike1() - nearest spike mark
+    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    return applyOffsets(
+      1.5 * TILE_WIDTH,
+      getAllianceSign() * -1.5 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  spike_middle: () => {
+    // getSpike2() - middle spike mark
+    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    return applyOffsets(
+      0.5 * TILE_WIDTH,
+      getAllianceSign() * -1.5 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  spike_far: () => {
+    // getSpike3() - farthest spike mark
+    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    return applyOffsets(
+      -0.5 * TILE_WIDTH,
+      getAllianceSign() * -1.5 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  loading_zone: () => {
+    // getSpike0() - loading zone position
+    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    return applyOffsets(
+      2.5 * TILE_WIDTH,
+      getAllianceSign() * -2.5 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  launch_near: () => {
+    // getLaunchNearPose()
+    const heading = getAllianceSign() * 220 * Math.PI / 180;
+    return applyOffsets(
+      -0.5 * TILE_WIDTH,
+      getAllianceSign() * -0.5 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  launch_far: () => {
+    // getLaunchFarPose()
+    const heading = getAllianceSign() * 201 * Math.PI / 180;
+    return applyOffsets(
+      2.5 * TILE_WIDTH,
+      getAllianceSign() * -0.5 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  gate: () => {
+    // getGatePose()
+    const heading = getAllianceSign() * 90 * Math.PI / 180;
+    return applyOffsets(
+      0 * TILE_WIDTH,
+      getAllianceSign() * -2 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  base: () => {
+    // getBasePose()
+    const heading = getAllianceSign() * 0 * Math.PI / 180;
+    return applyOffsets(
+      2 * TILE_WIDTH,
+      getAllianceSign() * 1.4 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  }
 };
 
 function pedroToCanvas(x, y) {
@@ -327,6 +419,8 @@ function calculatePathSegments() {
       actionTime = PEDRO_CONSTANTS.depositTime;
     } else if (wp.type === 'action') {
       actionTime = PEDRO_CONSTANTS.releaseGateTime;
+    } else if (wp.type === 'delay') {
+      actionTime = wp.delayTime || 0;
     }
     
     if (actionTime > 0) {
@@ -426,9 +520,7 @@ function updateVisualization() {
   currentAlliance = alliance;
   currentSide = side;
   
-  const key = `${alliance}_${side}`;
-  startPos = { ...START_POSITIONS[key] };
-  startPos.heading = startPos.heading * Math.PI / 180;
+  startPos = getStartPosition(alliance, side);
 
   currentPath = extractPathFromBlocks();
   calculatePathSegments();
@@ -554,6 +646,29 @@ function extractPathFromBlocks() {
       };
     }
     
+    else if (current.type === 'delay') {
+  const delayTime = Number(current.getFieldValue('time')) || 0;
+  
+  // Get the last waypoint's position, or start position if no waypoints yet
+  let lastPose;
+  if (path.length > 0) {
+    const lastWp = path[path.length - 1];
+    lastPose = { x: lastWp.x, y: lastWp.y, heading: lastWp.heading };
+  } else {
+    lastPose = { ...startPos };
+  }
+  
+  // Create a waypoint at the same position with delay type
+  waypoint = {
+    x: lastPose.x,
+    y: lastPose.y,
+    heading: lastPose.heading,
+    type: 'delay',
+    delayTime: delayTime,
+    label: `Wait ${delayTime}s`
+  };
+}
+    
     if (waypoint) {
       path.push(waypoint);
     }
@@ -582,9 +697,9 @@ function updateWaypointsList() {
   
   currentPath.forEach((wp, idx) => {
     let icon = '';
-    if (wp.type === 'deposit') icon = '';
-    else if (wp.type === 'intake') icon = '';
-    else if (wp.type === 'action') icon = '';
+    if (wp.type === 'deposit') icon = '📤';
+    else if (wp.type === 'intake') icon = '📥';
+    else if (wp.type === 'action') icon = '⚡';
     
     const moveTime = calculateMoveTime(currentPose, wp);
     cumulativeTime += moveTime;
@@ -627,7 +742,7 @@ function renderField() {
   if (imageLoaded) {
     ctx.save();
     ctx.translate(FIELD_SIZE / 2, FIELD_SIZE / 2);
-    ctx.rotate(Math.PI);
+    ctx.rotate(0);
     ctx.translate(-FIELD_SIZE / 2, -FIELD_SIZE / 2);
     ctx.drawImage(fieldImage, 0, 0, FIELD_SIZE, FIELD_SIZE);
     ctx.restore();
@@ -695,7 +810,7 @@ function renderField() {
       
       ctx.save();
       ctx.translate(pos.x, pos.y);
-      ctx.rotate(-wp.heading);
+      ctx.rotate(-wp.heading + Math.PI / 2); // Adjust so 0° = +X direction
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -724,7 +839,7 @@ function renderField() {
     const pos = pedroToCanvas(robotPose.x, robotPose.y);
     ctx.save();
     ctx.translate(pos.x, pos.y);
-    ctx.rotate(-robotPose.heading);
+    ctx.rotate(-robotPose.heading + Math.PI / 2); // Adjust so 0° = +X direction
     
     const robotSizeInches = 18;
     const robotSizePixels = robotSizeInches * (FIELD_SIZE / (FIELD_HALF * 2));

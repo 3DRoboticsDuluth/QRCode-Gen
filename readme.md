@@ -43,3 +43,6 @@ It generates a compressed QR code that can be scanned by a Limelight camera and 
 
 ### Robot Side
 Use `QRPlanDecoder.java` (provided in your FTC project) to decode QR → JSON → commands.
+
+### Updating
+Make sure to update whenever you change tuning values or change NavPoses.
