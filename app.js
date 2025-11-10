@@ -633,8 +633,8 @@ function extractPathFromBlocks() {
       };
     }
     
-    else if (current.type === 'delay') {
-      const delayTime = Number(current.getFieldValue('time')) || 0;
+    else if (current.type === 'delay_s') {
+      const delayTime = Number(current.getFieldValue('s')) || 0;
       
       // Get the last waypoint's position, or start position if no waypoints yet
       let lastPose;
