@@ -1259,13 +1259,13 @@ try {
     // Generate QR code - make it fill available space without overlapping button
     const isMobile = window.innerWidth <= 768;
     const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight - 70; // Reserve space for text and button
+    const containerHeight = window.innerHeight - (isMobile ? 65 : 70); // Less space reserved on mobile
     
     // Calculate QR size based on available space
     let qrSize;
     if (isMobile) {
-      // Mobile: generate large QR and scale to fill width
-      qrSize = Math.max(containerWidth * 2, 1200);
+      // Mobile: generate very large QR for high quality
+      qrSize = Math.max(containerWidth * 3, 1500);
     } else {
       // Desktop: fit nicely within container with padding
       qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
@@ -1275,12 +1275,14 @@ try {
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
     
     if (isMobile) {
-      // On mobile: force to screen width, let height overflow if needed
+      // On mobile: force to full viewport width using vw units
       qr.style.cssText = `
-        width: ${containerWidth}px !important; 
-        height: ${containerWidth}px !important; 
+        width: 100vw !important; 
+        height: 100vw !important; 
         display: block !important;
         flex-shrink: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       `;
     } else {
       // Desktop: show at calculated size
@@ -1298,11 +1300,11 @@ try {
     console.warn('kjua not available, trying image API', e);
     const isMobile = window.innerWidth <= 768;
     const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight - 70;
+    const containerHeight = window.innerHeight - (isMobile ? 65 : 70);
     
     let qrSize;
     if (isMobile) {
-      qrSize = Math.max(containerWidth * 2, 1200);
+      qrSize = Math.max(containerWidth * 3, 1500);
     } else {
       qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
     }
@@ -1315,10 +1317,12 @@ try {
     
     if (isMobile) {
       img.style.cssText = `
-        width: ${containerWidth}px !important; 
-        height: ${containerWidth}px !important; 
+        width: 100vw !important; 
+        height: 100vw !important; 
         display: block !important;
         flex-shrink: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       `;
     } else {
       img.style.cssText = `
@@ -1332,7 +1336,7 @@ try {
     }
     qrWrapper.appendChild(img);
   }
-
+  
   // Add back button
   const backBtn = document.createElement('button');
   backBtn.textContent = '← Back to Generator';
