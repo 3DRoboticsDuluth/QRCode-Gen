@@ -1254,21 +1254,23 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   `;
   qrView.appendChild(qrWrapper);
 
-  try {
+try {
     await ensureKjua();
-    // Use large size for both desktop and mobile
-    const qrSize = Math.min(window.innerWidth - 80, window.innerHeight - 200, 600);
+    // Make QR code 100% of screen width, calculate height based on available space
+    const qrSize = window.innerWidth; // Full width
+    console.log('QR Generation:', { qrSize, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
-    qr.style.cssText = 'max-width: 100%; max-height: 100%; width: auto; height: auto;';
+    qr.style.cssText = 'width: 100%; height: auto; display: block;';
     qrWrapper.appendChild(qr);
   } catch (e) {
     console.warn('kjua not available, trying image API', e);
-    const qrSize = Math.min(window.innerWidth - 80, window.innerHeight - 200, 600);
+    const qrSize = window.innerWidth; // Full width
+    console.log('QR Generation (fallback):', { qrSize, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=` + encodeURIComponent(b64);
     const img = document.createElement('img');
     img.alt = 'QR code';
     img.src = qrUrl;
-    img.style.cssText = 'max-width: 100%; max-height: 100%; width: auto; height: auto;';
+    img.style.cssText = 'width: 100%; height: auto; display: block;';
     qrWrapper.appendChild(img);
   }
 
