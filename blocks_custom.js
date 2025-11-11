@@ -12,6 +12,22 @@ Blockly.Blocks['start'] = {
   }
 };
 
+// PARTNER START BLOCK
+Blockly.Blocks['partner_start'] = {
+  init: function() {
+    this.appendDummyInput().appendField("▶ Partner Start");
+    this.setNextStatement(true);
+    this.setColour("#ff6b9d");
+    this.setDeletable(true);
+    this.setTooltip("Start block for your alliance partner's robot");
+  }
+};
+
+// Debug: confirm partner_start block is defined
+if (typeof console !== 'undefined') {
+  console.info('Partner start block defined:', typeof Blockly.Blocks['partner_start']);
+}
+
 // Start generator: walk next blocks and call their registered generator functions directly.
 Blockly.JavaScript['start'] = function(block) {
   let next = block.getNextBlock();

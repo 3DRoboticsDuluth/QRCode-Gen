@@ -37,7 +37,7 @@
   <!-- LEFT PANEL: Blockly -->
   <div id="left-panel">
     <div id="blockly-header">
-      <h1><img src="transparent-logo.png" width="200" height="60.862500000000004" alt="FTC Logo"></h1>
+      <h1><img src="transparent-logo.png" width="200" height="60.862500000000004" alt="Quanomous"></h1>
       <div id="blockly-controls">
         <button id="generateBtn">Generate QR</button>
         <button id="clearBtn">Clear</button>
@@ -51,25 +51,38 @@
     </div>
   </div>
 
-  <!-- RIGHT PANEL: Path Visualizer -->
+<!-- RIGHT PANEL: Path Visualizer -->
   <div id="right-panel">
     <div id="path-header">
       <h2>Path Visualizer</h2>
       <div id="start-controls">
-        <label>Alliance:</label>
+        <label>Your Robot:</label>
         <select id="alliance">
           <option value="RED">Red</option>
           <option value="BLUE">Blue</option>
         </select>
-        <label>Side:</label>
         <select id="side">
           <option value="NORTH">North</option>
           <option value="SOUTH">South</option>
         </select>
       </div>
+      <div id="partner-controls">
+        <label>
+          <input type="checkbox" id="partner-toggle" checked>
+          Show Partner
+        </label>
+        <select id="partner-alliance">
+          <option value="RED" selected>Red</option>
+          <option value="BLUE">Blue</option>
+        </select>
+        <select id="partner-side">
+          <option value="NORTH">North</option>
+          <option value="SOUTH" selected>South</option>
+        </select>
+      </div>
       <div class="info-text">Path updates as you build</div>
     </div>
-    
+
     <div id="canvas-container">
       <canvas id="canvas" width="600" height="600"></canvas>
     </div>
@@ -87,17 +100,20 @@
   </div>
 
   <xml id="toolbox" style="display: none">
-    <category name="Start" colour="#f9c74f">
-      <block type="start"></block>
-    </category>
-    <category name="Actions" colour="#5C68A6">
-      <block type="drive_to"></block>
-      <block type="intake_row"></block>
-      <block type="delay_s"></block>
-      <block type="release_gate"></block>
-      <block type="deposit"></block>
-    </category>
-  </xml>
+  <category name="Start" colour="#f9c74f">
+    <block type="start"></block>
+  </category>
+  <category name="Partner" colour="#ff6b9d">
+    <block type="partner_start"></block>
+  </category>
+  <category name="Actions" colour="#5C68A6">
+    <block type="drive_to"></block>
+    <block type="intake_row"></block>
+    <block type="delay_s"></block>
+    <block type="release_gate"></block>
+    <block type="deposit"></block>
+  </category>
+</xml>
 
   <script src="blocks_custom.js"></script>
   <script src="app.js"></script>

@@ -173,16 +173,24 @@ let fieldImage = new Image();
 let robotImage = new Image();
 let imageLoaded = false;
 let robotImageLoaded = false;
+let partnerRobotImageLoaded = false;
 let currentPath = [];
+let partnerPath = [];
 let startPos = null;
+let partnerStartPos = null;
 let currentAlliance = 'RED';
 let currentSide = 'NORTH';
+let partnerAlliance = 'RED';
+let partnerSide = 'SOUTH';
+let showPartner = true;
 
 let animationRunning = false;
 let animationProgress = 0;
 let animationStartTime = 0;
 let totalPathTime = 0;
 let pathSegments = [];
+let partnerPathSegments = [];
+let partnerTotalPathTime = 0;
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
@@ -234,6 +242,9 @@ robotImage.onerror = function() {
   updateVisualization();
 };
 robotImage.src = 'robot.png';
+
+// Don't try to load partner robot image - just use fallback box
+partnerRobotImageLoaded = false;
 
 // ============================================================================
 // START POSITIONS AND NAMED POSES
@@ -444,6 +455,60 @@ function calculatePathSegments() {
   updateTimerDisplay();
 }
 
+function calculatePartnerPathSegments() {
+  if (!partnerStartPos || partnerPath.length === 0) {
+    partnerPathSegments = [];
+    partnerTotalPathTime = 0;
+    return;
+  }
+  
+  const segments = [];
+  let currentPose = { ...partnerStartPos };
+  let cumulativeTime = 0;
+  
+  partnerPath.forEach((wp, idx) => {
+    const moveTime = calculateMoveTime(currentPose, wp);
+    segments.push({
+      startPose: { ...currentPose },
+      endPose: { x: wp.x, y: wp.y, heading: wp.heading },
+      startTime: cumulativeTime,
+      duration: moveTime,
+      type: 'move',
+      label: wp.label
+    });
+    cumulativeTime += moveTime;
+    
+    let actionTime = 0;
+    if (wp.type === 'intake') {
+      actionTime = PEDRO_CONSTANTS.intakeTime;
+    } else if (wp.type === 'deposit') {
+      actionTime = PEDRO_CONSTANTS.depositTime;
+    } else if (wp.type === 'action') {
+      actionTime = PEDRO_CONSTANTS.releaseGateTime;
+    } else if (wp.type === 'delay') {
+      actionTime = wp.delayTime || 0;
+    }
+    
+    if (actionTime > 0) {
+      segments.push({
+        startPose: { x: wp.x, y: wp.y, heading: wp.heading },
+        endPose: { x: wp.x, y: wp.y, heading: wp.heading },
+        startTime: cumulativeTime,
+        duration: actionTime,
+        type: 'action',
+        actionType: wp.type,
+        label: wp.label
+      });
+      cumulativeTime += actionTime;
+    }
+    
+    currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
+  });
+  
+  partnerPathSegments = segments;
+  partnerTotalPathTime = cumulativeTime;
+}
+
 function getRobotPoseAtTime(time) {
   if (pathSegments.length === 0) return null;
   
@@ -485,6 +550,42 @@ function getRobotPoseAtTime(time) {
   return { ...startPos };
 }
 
+function getPartnerRobotPoseAtTime(time) {
+  if (partnerPathSegments.length === 0) return null;
+  
+  for (const seg of partnerPathSegments) {
+    if (time >= seg.startTime && time < seg.startTime + seg.duration) {
+      const elapsed = time - seg.startTime;
+      
+      if (seg.type === 'action') {
+        return { ...seg.startPose };
+      }
+      
+      let t = elapsed / seg.duration;
+      t = t < 0.5 
+        ? 4 * t * t * t 
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      
+      const x = seg.startPose.x + (seg.endPose.x - seg.startPose.x) * t;
+      const y = seg.startPose.y + (seg.endPose.y - seg.startPose.y) * t;
+      
+      let dh = seg.endPose.heading - seg.startPose.heading;
+      while (dh > Math.PI) dh -= 2 * Math.PI;
+      while (dh < -Math.PI) dh += 2 * Math.PI;
+      const heading = seg.startPose.heading + dh * t;
+      
+      return { x, y, heading };
+    }
+  }
+  
+  if (time >= partnerTotalPathTime && partnerPathSegments.length > 0) {
+    const lastSeg = partnerPathSegments[partnerPathSegments.length - 1];
+    return { ...lastSeg.endPose };
+  }
+  
+  return { ...partnerStartPos };
+}
+
 // ============================================================================
 // BLOCK MANAGEMENT
 // ============================================================================
@@ -496,6 +597,13 @@ function ensureStartBlock() {
     startBlock.initSvg();
     startBlock.render();
     startBlock.moveBy(50, 50);
+  }
+  if (!workspace.getAllBlocks(false).some(b => b.type === 'partner_start')) {
+    const partnerBlock = workspace.newBlock('partner_start');
+    workspace.addTopBlock(partnerBlock);
+    partnerBlock.initSvg();
+    partnerBlock.render();
+    partnerBlock.moveBy(250, 50);
   }
 }
 
@@ -514,6 +622,21 @@ document.getElementById('side').addEventListener('change', (e) => {
   updateVisualization();
 });
 
+document.getElementById('partner-toggle').addEventListener('change', (e) => {
+  showPartner = e.target.checked;
+  updateVisualization();
+});
+
+document.getElementById('partner-alliance').addEventListener('change', (e) => {
+  partnerAlliance = e.target.value;
+  updateVisualization();
+});
+
+document.getElementById('partner-side').addEventListener('change', (e) => {
+  partnerSide = e.target.value;
+  updateVisualization();
+});
+
 function updateVisualization() {
   const alliance = document.getElementById('alliance').value;
   const side = document.getElementById('side').value;
@@ -524,13 +647,33 @@ function updateVisualization() {
 
   currentPath = extractPathFromBlocks();
   calculatePathSegments();
+  
+  // Update partner toggle state
+  const partnerToggle = document.getElementById('partner-toggle');
+  if (partnerToggle) {
+    showPartner = partnerToggle.checked;
+  }
+  
+  // Update partner if enabled
+  if (showPartner) {
+    const pAlliance = document.getElementById('partner-alliance');
+    const pSide = document.getElementById('partner-side');
+    if (pAlliance && pSide) {
+      partnerAlliance = pAlliance.value;
+      partnerSide = pSide.value;
+    }
+    partnerStartPos = getStartPosition(partnerAlliance, partnerSide);
+    partnerPath = extractPathFromBlocks('partner_start');
+    calculatePartnerPathSegments();
+  }
+  
   updateWaypointsList();
   renderField();
 }
 
-function extractPathFromBlocks() {
+function extractPathFromBlocks(startBlockType = 'start') {
   const path = [];
-  const startBlock = workspace.getTopBlocks(true).find(b => b.type === 'start');
+  const startBlock = workspace.getTopBlocks(true).find(b => b.type === startBlockType);
   if (!startBlock) return path;
 
   let current = startBlock.getNextBlock();
@@ -552,8 +695,13 @@ function extractPathFromBlocks() {
       const txo = Number(current.getFieldValue('txo')) || 0;
       const tyo = Number(current.getFieldValue('tyo')) || 0;
       
-      // Get base pose from locale
+      // Get base pose from locale - need to use the correct alliance context
+      const savedAlliance = currentAlliance;
+      if (startBlockType === 'partner_start') {
+        currentAlliance = partnerAlliance;
+      }
       const pose = locale === 'near' ? NAMED_POSES.launch_near() : NAMED_POSES.launch_far();
+      currentAlliance = savedAlliance;
       
       // Apply tile offsets
       const x = pose.x + (txo * TILE_WIDTH);
@@ -571,6 +719,12 @@ function extractPathFromBlocks() {
     else if (current.type === 'intake_row') {
       const spike = Number(current.getFieldValue('spike')) || 0;
       let pose;
+      
+      // Save and restore alliance context for partner
+      const savedAlliance = currentAlliance;
+      if (startBlockType === 'partner_start') {
+        currentAlliance = partnerAlliance;
+      }
       
       if (spike === 0) {
         pose = NAMED_POSES.loading_zone();
@@ -609,10 +763,18 @@ function extractPathFromBlocks() {
           label: 'Intake Far'
         };
       }
+      
+      currentAlliance = savedAlliance;
     }
     
     else if (current.type === 'intake_human') {
+      const savedAlliance = currentAlliance;
+      if (startBlockType === 'partner_start') {
+        currentAlliance = partnerAlliance;
+      }
       const pose = NAMED_POSES.loading_zone();
+      currentAlliance = savedAlliance;
+      
       waypoint = {
         x: pose.x,
         y: pose.y,
@@ -623,7 +785,13 @@ function extractPathFromBlocks() {
     }
     
     else if (current.type === 'release_gate') {
+      const savedAlliance = currentAlliance;
+      if (startBlockType === 'partner_start') {
+        currentAlliance = partnerAlliance;
+      }
       const pose = NAMED_POSES.gate();
+      currentAlliance = savedAlliance;
+      
       waypoint = {
         x: pose.x,
         y: pose.y,
@@ -642,7 +810,7 @@ function extractPathFromBlocks() {
         const lastWp = path[path.length - 1];
         lastPose = { x: lastWp.x, y: lastWp.y, heading: lastWp.heading };
       } else {
-        lastPose = { ...startPos };
+        lastPose = startBlockType === 'partner_start' ? { ...partnerStartPos } : { ...startPos };
       }
       
       // Create a waypoint at the same position with delay type
@@ -759,6 +927,57 @@ function renderField() {
     ctx.restore();
   }
 
+  // Draw partner path first (behind main robot)
+  if (showPartner && partnerPath.length > 0 && partnerStartPos) {
+    ctx.strokeStyle = 'rgba(255, 107, 157, 0.6)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    
+    const start = pedroToCanvas(partnerStartPos.x, partnerStartPos.y);
+    ctx.moveTo(start.x, start.y);
+    
+    partnerPath.forEach(wp => {
+      const pos = pedroToCanvas(wp.x, wp.y);
+      ctx.lineTo(pos.x, pos.y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    partnerPath.forEach((wp, idx) => {
+      const pos = pedroToCanvas(wp.x, wp.y);
+      
+      if (wp.type === 'deposit') {
+        ctx.fillStyle = '#ff6b9d';
+      } else if (wp.type === 'intake') {
+        ctx.fillStyle = '#ff85a8';
+      } else if (wp.type === 'action') {
+        ctx.fillStyle = '#ff9fb3';
+      } else {
+        ctx.fillStyle = '#ffb3c6';
+      }
+      
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      
+      ctx.save();
+      ctx.translate(pos.x, pos.y);
+      ctx.rotate(-wp.heading + Math.PI / 2);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -12);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  // Draw main robot path
   if (currentPath.length > 0 && startPos) {
     ctx.strokeStyle = 'rgba(249, 199, 79, 0.6)';
     ctx.lineWidth = 3;
@@ -797,7 +1016,7 @@ function renderField() {
       
       ctx.save();
       ctx.translate(pos.x, pos.y);
-      ctx.rotate(-wp.heading + Math.PI / 2); // Adjust so 0° = +X direction
+      ctx.rotate(-wp.heading + Math.PI / 2);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -812,30 +1031,31 @@ function renderField() {
     });
   }
 
-  let robotPose = startPos;
-  if (animationRunning && pathSegments.length > 0) {
-    const elapsed = (Date.now() - animationStartTime) / 1000;
-    robotPose = getRobotPoseAtTime(elapsed) || startPos;
-    
-    if (elapsed >= totalPathTime) {
-      stopAnimation();
+  // Draw main robot
+  if (startPos) {
+    let robotPose = startPos;
+    if (animationRunning && pathSegments.length > 0) {
+      const elapsed = (Date.now() - animationStartTime) / 1000;
+      robotPose = getRobotPoseAtTime(elapsed) || startPos;
+      
+      if (elapsed >= totalPathTime) {
+        stopAnimation();
+      }
     }
-  }
-  
-  if (robotPose) {
+    
     const pos = pedroToCanvas(robotPose.x, robotPose.y);
     ctx.save();
     ctx.translate(pos.x, pos.y);
-    ctx.rotate(-robotPose.heading + Math.PI / 2); // Adjust so 0° = +X direction
+    ctx.rotate(-robotPose.heading + Math.PI / 2);
     
     const robotSizeInches = 18;
     const robotSizePixels = robotSizeInches * (FIELD_SIZE / (FIELD_HALF * 2));
+    const halfSize = robotSizePixels / 2;
     
     if (robotImageLoaded) {
-      ctx.drawImage(robotImage, -robotSizePixels/2, -robotSizePixels/2, robotSizePixels, robotSizePixels);
+      ctx.drawImage(robotImage, -halfSize, -halfSize, robotSizePixels, robotSizePixels);
     } else {
-      const halfSize = robotSizePixels / 2;
-      ctx.fillStyle = 'rgba(67, 170, 139, 0.8)';
+      ctx.fillStyle = 'rgba(67, 170, 139, 0.9)';
       ctx.fillRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
@@ -844,11 +1064,47 @@ function renderField() {
       ctx.fillStyle = '#f9c74f';
       ctx.beginPath();
       ctx.moveTo(0, -halfSize);
-      ctx.lineTo(-halfSize * 0.4, -halfSize * 1.3);
-      ctx.lineTo(halfSize * 0.4, -halfSize * 1.3);
+      ctx.lineTo(-halfSize * 0.4, -halfSize * 0.6);
+      ctx.lineTo(halfSize * 0.4, -halfSize * 0.6);
       ctx.closePath();
       ctx.fill();
     }
+    
+    ctx.restore();
+  }
+
+  // Draw partner robot on top
+  if (showPartner && partnerStartPos) {
+    let partnerPose = partnerStartPos;
+    if (animationRunning && partnerPathSegments.length > 0) {
+      const elapsed = (Date.now() - animationStartTime) / 1000;
+      partnerPose = getPartnerRobotPoseAtTime(elapsed) || partnerStartPos;
+    }
+    
+    const pos = pedroToCanvas(partnerPose.x, partnerPose.y);
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(-partnerPose.heading + Math.PI / 2);
+    
+    const robotSizeInches = 18;
+    const robotSizePixels = robotSizeInches * (FIELD_SIZE / (FIELD_HALF * 2));
+    const halfSize = robotSizePixels / 2;
+    
+    // Always draw fallback rectangle for partner robot
+    ctx.fillStyle = 'rgba(255, 107, 157, 0.9)';
+    ctx.fillRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-halfSize, -halfSize, robotSizePixels, robotSizePixels);
+    
+    // Forward direction indicator
+    ctx.fillStyle = '#ff85a8';
+    ctx.beginPath();
+    ctx.moveTo(0, -halfSize);
+    ctx.lineTo(-halfSize * 0.4, -halfSize * 0.6);
+    ctx.lineTo(halfSize * 0.4, -halfSize * 0.6);
+    ctx.closePath();
+    ctx.fill();
     
     ctx.restore();
   }
@@ -1235,3 +1491,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 ensureStartBlock();
 updateVisualization();
+setTimeout(() => {
+  resizeCanvas();
+  renderField();
+}, 200);

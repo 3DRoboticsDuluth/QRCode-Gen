@@ -98,6 +98,33 @@ input, select, textarea {
   color: #cccccc;
 }
 
+#partner-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 6px;
+  background: #2d2d30;
+  border-radius: 3px;
+}
+
+#partner-controls label {
+  font-size: 0.85rem;
+  color: #ff6b9d;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+#partner-toggle {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
 #canvas-container {
   flex: 1;
   display: flex;
