@@ -1256,26 +1256,34 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
 
 try {
     await ensureKjua();
-    // Make QR code fill the container completely - scale up to fill width
-    const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight - 70; // 20px top + 50px bottom
-    // Use 1.5x the larger dimension to ensure it overflows and fills the space
-    const qrSize = Math.floor(Math.max(containerWidth, containerHeight) * 1.5);
-    console.log('QR Generation:', { qrSize, containerWidth, containerHeight, viewport: `${window.innerWidth}x${window.innerHeight}` });
+    // Generate massive QR code to ensure it fills even the largest phones
+    // Pixel 9 and similar devices need very large QR codes
+    const qrSize = Math.max(window.innerWidth, window.innerHeight, 1200);
+    console.log('QR Generation:', { qrSize, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
-    qr.style.cssText = `width: 100vw; height: auto; display: block; min-width: 100vw;`;
+    qr.style.cssText = `
+      width: 100vw !important; 
+      height: 100vw !important; 
+      display: block !important; 
+      min-width: 100vw !important;
+      min-height: 100vw !important;
+      object-fit: cover !important;
+    `;
     qrWrapper.appendChild(qr);
   } catch (e) {
     console.warn('kjua not available, trying image API', e);
-    const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight - 70;
-    const qrSize = Math.floor(Math.max(containerWidth, containerHeight) * 1.5);
-    console.log('QR Generation (fallback):', { qrSize, containerWidth, containerHeight, viewport: `${window.innerWidth}x${window.innerHeight}` });
+    const qrSize = Math.max(window.innerWidth, window.innerHeight, 1200);
+    console.log('QR Generation (fallback):', { qrSize, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=` + encodeURIComponent(b64);
     const img = document.createElement('img');
     img.alt = 'QR code';
     img.src = qrUrl;
-    img.style.cssText = `width: 100vw; height: auto; display: block; min-width: 100vw;`;
+    img.style.cssText = `
+      width: 100vw !important; 
+      height: 100vw !important; 
+      display: block !important;
+      object-fit: cover !important;
+    `;
     qrWrapper.appendChild(img);
   }
 
