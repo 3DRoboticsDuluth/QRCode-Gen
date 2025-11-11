@@ -1256,34 +1256,80 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
 
 try {
     await ensureKjua();
-    // Generate massive QR code to ensure it fills even the largest phones
-    // Pixel 9 and similar devices need very large QR codes
-    const qrSize = Math.max(window.innerWidth, window.innerHeight, 1200);
-    console.log('QR Generation:', { qrSize, viewport: `${window.innerWidth}x${window.innerHeight}` });
+    // Generate QR code - make it fill available space without overlapping button
+    const isMobile = window.innerWidth <= 768;
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight - 70; // Reserve space for text and button
+    
+    // Calculate QR size based on available space
+    let qrSize;
+    if (isMobile) {
+      // Mobile: use larger of the two dimensions, minimum 1200px
+      qrSize = Math.max(containerWidth, containerHeight, 1200);
+    } else {
+      // Desktop: fit nicely within container with padding
+      qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
+    }
+    
+    console.log('QR Generation:', { qrSize, isMobile, containerWidth, containerHeight, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
-    qr.style.cssText = `
-      width: 100vw !important; 
-      height: 100vw !important; 
-      display: block !important; 
-      min-width: 100vw !important;
-      min-height: 100vw !important;
-      object-fit: cover !important;
-    `;
+    
+    if (isMobile) {
+      // On mobile: fill width completely, but container will constrain height
+      qr.style.cssText = `
+        width: 100% !important; 
+        height: 100% !important; 
+        display: block !important;
+        object-fit: contain !important;
+      `;
+    } else {
+      // Desktop: show at calculated size
+      qr.style.cssText = `
+        width: ${qrSize}px; 
+        height: ${qrSize}px; 
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      `;
+    }
     qrWrapper.appendChild(qr);
   } catch (e) {
     console.warn('kjua not available, trying image API', e);
-    const qrSize = Math.max(window.innerWidth, window.innerHeight, 1200);
-    console.log('QR Generation (fallback):', { qrSize, viewport: `${window.innerWidth}x${window.innerHeight}` });
+    const isMobile = window.innerWidth <= 768;
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight - 70;
+    
+    let qrSize;
+    if (isMobile) {
+      qrSize = Math.max(containerWidth, containerHeight, 1200);
+    } else {
+      qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
+    }
+    
+    console.log('QR Generation (fallback):', { qrSize, isMobile, containerWidth, containerHeight, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=` + encodeURIComponent(b64);
     const img = document.createElement('img');
     img.alt = 'QR code';
     img.src = qrUrl;
-    img.style.cssText = `
-      width: 100vw !important; 
-      height: 100vw !important; 
-      display: block !important;
-      object-fit: cover !important;
-    `;
+    
+    if (isMobile) {
+      img.style.cssText = `
+        width: 100% !important; 
+        height: 100% !important; 
+        display: block !important;
+        object-fit: contain !important;
+      `;
+    } else {
+      img.style.cssText = `
+        width: ${qrSize}px; 
+        height: ${qrSize}px; 
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      `;
+    }
     qrWrapper.appendChild(img);
   }
 
