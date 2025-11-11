@@ -1264,8 +1264,8 @@ try {
     // Calculate QR size based on available space
     let qrSize;
     if (isMobile) {
-      // Mobile: use larger of the two dimensions, minimum 1200px
-      qrSize = Math.max(containerWidth, containerHeight, 1200);
+      // Mobile: generate large QR and scale to fill width
+      qrSize = Math.max(containerWidth * 2, 1200);
     } else {
       // Desktop: fit nicely within container with padding
       qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
@@ -1275,12 +1275,12 @@ try {
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
     
     if (isMobile) {
-      // On mobile: fill width completely, but container will constrain height
+      // On mobile: force to screen width, let height overflow if needed
       qr.style.cssText = `
-        width: 100% !important; 
-        height: 100% !important; 
+        width: ${containerWidth}px !important; 
+        height: ${containerWidth}px !important; 
         display: block !important;
-        object-fit: contain !important;
+        flex-shrink: 0 !important;
       `;
     } else {
       // Desktop: show at calculated size
@@ -1302,7 +1302,7 @@ try {
     
     let qrSize;
     if (isMobile) {
-      qrSize = Math.max(containerWidth, containerHeight, 1200);
+      qrSize = Math.max(containerWidth * 2, 1200);
     } else {
       qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
     }
@@ -1315,10 +1315,10 @@ try {
     
     if (isMobile) {
       img.style.cssText = `
-        width: 100% !important; 
-        height: 100% !important; 
+        width: ${containerWidth}px !important; 
+        height: ${containerWidth}px !important; 
         display: block !important;
-        object-fit: contain !important;
+        flex-shrink: 0 !important;
       `;
     } else {
       img.style.cssText = `
