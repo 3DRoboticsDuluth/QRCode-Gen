@@ -1198,7 +1198,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   const qrContainer = document.getElementById('qr');
   qrContainer.innerHTML = '';
 
-  // Hide both panels and show QR in full screen (desktop and mobile)
+  // Hide both panels and show QR in full screen
   const rightPanel = document.getElementById('right-panel');
   const leftPanel = document.getElementById('left-panel');
   
@@ -1222,7 +1222,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
       align-items: center;
       justify-content: center;
       z-index: 9999;
-      padding: 20px;
+      padding: 0;
       box-sizing: border-box;
     `;
     document.body.appendChild(qrView);
@@ -1231,126 +1231,87 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   qrView.innerHTML = '';
   qrView.style.display = 'flex';
 
-  // Add info text
+  // Add info text at top
   const infoText = document.createElement('div');
   infoText.textContent = `Steps: ${plan.length} | Size: ${b64.length} chars`;
   infoText.style.cssText = `
+    position: absolute;
+    top: 5px;
+    left: 0;
+    right: 0;
     color: #888;
-    font-size: 1rem;
-    margin-bottom: 20px;
+    font-size: 0.7rem;
     text-align: center;
+    z-index: 10;
   `;
   qrView.appendChild(infoText);
 
   // Add QR container
   const qrWrapper = document.createElement('div');
   qrWrapper.style.cssText = `
+    position: absolute;
+    top: 25px;
+    bottom: 50px;
+    left: 0;
+    right: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 1;
-    max-width: 90vw;
-    max-height: 70vh;
+    overflow: hidden;
   `;
   qrView.appendChild(qrWrapper);
 
-try {
+  // Generate QR code
+  try {
     await ensureKjua();
-    // Generate QR code - make it fill available space without overlapping button
     const isMobile = window.innerWidth <= 768;
-    const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight - (isMobile ? 65 : 70); // Less space reserved on mobile
+    const qrSize = 2000;
     
-    // Calculate QR size based on available space
-    let qrSize;
-    if (isMobile) {
-      // Mobile: generate very large QR for high quality
-      qrSize = Math.max(containerWidth * 3, 1500);
-    } else {
-      // Desktop: fit nicely within container with padding
-      qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
-    }
-    
-    console.log('QR Generation:', { qrSize, isMobile, containerWidth, containerHeight, viewport: `${window.innerWidth}x${window.innerHeight}` });
+    console.log('QR Generation:', { qrSize, isMobile, viewport: `${window.innerWidth}x${window.innerHeight}` });
     const qr = kjua({ render: 'svg', text: b64, size: qrSize, ecLevel: 'H' });
     
     if (isMobile) {
-      // On mobile: force to full viewport width using vw units
-      qr.style.cssText = `
-        width: 100vw !important; 
-        height: 100vw !important; 
-        display: block !important;
-        flex-shrink: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      `;
+      qr.style.cssText = `width: 100%; height: auto; display: block; max-width: none;`;
     } else {
-      // Desktop: show at calculated size
-      qr.style.cssText = `
-        width: ${qrSize}px; 
-        height: ${qrSize}px; 
-        display: block;
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-      `;
+      qr.style.cssText = `width: 600px; height: 600px; display: block;`;
     }
     qrWrapper.appendChild(qr);
   } catch (e) {
     console.warn('kjua not available, trying image API', e);
     const isMobile = window.innerWidth <= 768;
-    const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight - (isMobile ? 65 : 70);
-    
-    let qrSize;
-    if (isMobile) {
-      qrSize = Math.max(containerWidth * 3, 1500);
-    } else {
-      qrSize = Math.min(containerWidth * 0.8, containerHeight * 0.9, 800);
-    }
-    
-    console.log('QR Generation (fallback):', { qrSize, isMobile, containerWidth, containerHeight, viewport: `${window.innerWidth}x${window.innerHeight}` });
+    const qrSize = 2000;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=` + encodeURIComponent(b64);
     const img = document.createElement('img');
     img.alt = 'QR code';
     img.src = qrUrl;
     
     if (isMobile) {
-      img.style.cssText = `
-        width: 100vw !important; 
-        height: 100vw !important; 
-        display: block !important;
-        flex-shrink: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      `;
+      img.style.cssText = `width: 100%; height: auto; display: block; max-width: none;`;
     } else {
-      img.style.cssText = `
-        width: ${qrSize}px; 
-        height: ${qrSize}px; 
-        display: block;
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-      `;
+      img.style.cssText = `width: 600px; height: 600px; display: block;`;
     }
     qrWrapper.appendChild(img);
   }
-  
-  // Add back button
+
+  // Add back button at bottom
   const backBtn = document.createElement('button');
   backBtn.textContent = '← Back to Generator';
+  const isMobileBtn = window.innerWidth <= 768;
   backBtn.style.cssText = `
-    margin-top: 30px;
-    padding: 12px 24px;
-    font-size: 16px;
+    position: absolute;
+    bottom: ${isMobileBtn ? '2px' : '5px'};
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    font-size: 13px;
     background: #43aa8b;
     color: white;
     border: none;
     border-radius: 3px;
     cursor: pointer;
     font-weight: 600;
-    min-height: 44px;
+    min-height: 40px;
+    z-index: 10;
   `;
   backBtn.onclick = () => {
     qrView.style.display = 'none';
