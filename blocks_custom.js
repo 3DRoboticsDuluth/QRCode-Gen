@@ -69,7 +69,15 @@ Blockly.Blocks['drive_to'] = {
       .appendField("Y:")
       .appendField(new Blockly.FieldNumber(0), "ty")
       .appendField("heading:")
-      .appendField(new Blockly.FieldNumber(0,0,360), "h");
+      .appendField(new Blockly.FieldNumber(0,0,360), "h")
+      .appendField("Axial:")
+      .appendField(new Blockly.FieldDropdown(
+        [["Center","center"],["Front","front"], ["Back","back"]]
+      ))
+      .appendField("Lateral:")
+      .appendField(new Blockly.FieldDropdown(
+        [["Center","center"],["Left","left"], ["Right","right"]]
+      ), "Lateral");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour("#43aa8b");
@@ -80,7 +88,9 @@ Blockly.JavaScript['drive_to'] = function(block){
   const tx = Number(block.getFieldValue('tx'))||0;
   const ty = Number(block.getFieldValue('ty'))||0;
   const h = Number(block.getFieldValue('h'))||0;
-  return JSON.stringify({cmd:'drive', tx, ty, h});
+  const axial = block.getFieldValue('Axial');
+  const lateral = block.getFieldValue('Lateral');
+  return JSON.stringify({cmd:'drive', tx, ty, h, axial, lateral});
 };
 
 // INTAKE ROW (0-3, where 0 = human)
@@ -164,7 +174,7 @@ Blockly.Blocks['delay_s'] = {
 };
 Blockly.JavaScript['delay_s'] = function(block){
   const s = Number(block.getFieldValue('s'))||0;
-  const seconds = Math.round(s * 1000);
+  const seconds = Math.round(s);
   return JSON.stringify({cmd:'delay', seconds});
 };
 
