@@ -63,14 +63,16 @@ document.addEventListener('gestureend', function(e) {
 // ============================================================================
 
 const PEDRO_CONSTANTS = {
-  xMovementVelocity: 30,
-  yMovementVelocity: 30,
+  xMovementVelocity: 57.1558,
+  yMovementVelocity: 59.1667,
   turnVelocity: 90,
+  forwardZeroPowerAcceleration: -39.6768,
+  lateralZeroPowerAcceleration: -77.5455,
   intakeTime: 1.5,
   depositTime: 2.0,
   releaseGateTime: 1.0,
-  robotLength: 14,
-  robotWidth: 14
+  robotLength: 14.25,
+  robotWidth: 11.375
 };
 
 // ============================================================================
