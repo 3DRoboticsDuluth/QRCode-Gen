@@ -68,11 +68,28 @@ const PEDRO_CONSTANTS = {
   turnVelocity: 90,
   forwardZeroPowerAcceleration: -39.6768,
   lateralZeroPowerAcceleration: -77.5455,
-  intakeTime: 1.5,
-  depositTime: 2.0,
+  intakeTime: 2.75,
+  depositTime: 2.25,
   releaseGateTime: 1.0,
   robotLength: 14.25,
   robotWidth: 11.375
+};
+
+// Drive modifiers for different waypoint types/locales.
+// Values < 1.0 reduce allowed velocity (i.e. increase travel time for precise approaches).
+const DRIVE_TYPE_SPEED_FACTORS = {
+  default: 1.0,
+  deposit: 0.8,
+  intake: 0.85,
+  action: 0.9,
+  delay: 1.0,
+  drive: 1.0,
+  start: 1.0
+};
+
+const DEPOSIT_LOCALE_FACTORS = {
+  near: 0.9,
+  far: 0.8
 };
 
 // ============================================================================
@@ -248,45 +265,31 @@ robotImage.src = 'robot.png';
 // Don't try to load partner robot image - just use fallback box
 partnerRobotImageLoaded = false;
 
-// ============================================================================
-// START POSITIONS AND NAMED POSES
-// ============================================================================
-
-function getStartPosition(alliance, side) {
-  const allianceSign = alliance === 'RED' ? -1 : 1;
-  
-  if (side === 'NORTH') {
-    // getStartNorthPose()
-    return applyOffsets(
-      3 * TILE_WIDTH,
-      allianceSign * -0.5 * TILE_WIDTH,
-      0, // heading: 0 degrees (facing +X)
-      Axial.FRONT,
-      Lateral.CENTER
-    );
-  } else {
-    // getStartSouthPose()
-    return applyOffsets(
-      -3 * TILE_WIDTH,
-      allianceSign * -1.5 * TILE_WIDTH,
-      0, // heading: 0 degrees (facing +X)
-      Axial.BACK,
-      Lateral.CENTER
-    );
-  }
-}
-
 function getAllianceSign() {
   return currentAlliance === 'RED' ? -1 : 1;
 }
 
 const NAMED_POSES = {
+  // Loading zone (Human intake) - getSpike0()
+  loading_zone: () => {
+    const heading = getAllianceSign() * -10 * Math.PI / 180;
+    return applyOffsets(
+      1.8 * TILE_WIDTH,
+      getAllianceSign() * -2.6 * TILE_WIDTH,
+      heading,
+      Axial.CENTER,
+      Lateral.CENTER
+    );
+  },
+  
+  // Spike marks - getSpike1/2/3()
+  // NOTE: Updated from -1.2 to -1.1 tiles Y coordinate
   spike_near: () => {
     // getSpike1() - nearest spike mark
     const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       1.5 * TILE_WIDTH,
-      getAllianceSign() * -1.5 * TILE_WIDTH,
+      getAllianceSign() * -1.1 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
@@ -297,7 +300,7 @@ const NAMED_POSES = {
     const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       0.5 * TILE_WIDTH,
-      getAllianceSign() * -1.5 * TILE_WIDTH,
+      getAllianceSign() * -1.1 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
@@ -308,29 +311,20 @@ const NAMED_POSES = {
     const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
       -0.5 * TILE_WIDTH,
-      getAllianceSign() * -1.5 * TILE_WIDTH,
+      getAllianceSign() * -1.1 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
     );
   },
-  loading_zone: () => {
-    // getSpike0() - loading zone position
-    const heading = getAllianceSign() * -90 * Math.PI / 180;
-    return applyOffsets(
-      2.5 * TILE_WIDTH,
-      getAllianceSign() * -2.5 * TILE_WIDTH,
-      heading,
-      Axial.CENTER,
-      Lateral.CENTER
-    );
-  },
+  
+  // Launch positions
   launch_near: () => {
     // getLaunchNearPose()
     const heading = getAllianceSign() * 45 * Math.PI / 180;
     return applyOffsets(
       -0.5 * TILE_WIDTH,
-      getAllianceSign() * -0.5 * TILE_WIDTH,
+      getAllianceSign() * -0.67 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
@@ -338,38 +332,86 @@ const NAMED_POSES = {
   },
   launch_far: () => {
     // getLaunchFarPose()
+    // NOTE: Updated from 2.0 to 2.33 tiles X coordinate
     const heading = getAllianceSign() * 20 * Math.PI / 180;
     return applyOffsets(
-      2.5 * TILE_WIDTH,
-      getAllianceSign() * -0.5 * TILE_WIDTH,
+      2.33 * TILE_WIDTH,
+      getAllianceSign() * -0.67 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
     );
   },
+  
+  // Gate position
   gate: () => {
     // getGatePose()
     const heading = getAllianceSign() * -90 * Math.PI / 180;
     return applyOffsets(
-      0 * TILE_WIDTH,
+      0.1 * TILE_WIDTH,
       getAllianceSign() * -2 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
     );
   },
+  
+  // Goal position (for reference, not used in path planning)
+  goal: () => {
+    // getGoalPose()
+    const heading = getAllianceSign() * 45 * Math.PI / 180;
+    return {
+      x: -2.75 * TILE_WIDTH,
+      y: getAllianceSign() * -2.75 * TILE_WIDTH,
+      heading: heading
+    };
+  },
+  
+  // Base/parking position
   base: () => {
     // getBasePose()
     const heading = getAllianceSign() * 0 * Math.PI / 180;
     return applyOffsets(
-      2 * TILE_WIDTH,
-      getAllianceSign() * 1.4 * TILE_WIDTH,
+      1.5 * TILE_WIDTH,
+      getAllianceSign() * 1.33 * TILE_WIDTH,
       heading,
       Axial.CENTER,
       Lateral.CENTER
     );
   }
 };
+
+// ============================================================================
+// START POSITIONS - SYNCHRONIZED WITH NavSubsystem.java
+// ============================================================================
+
+function getStartPosition(alliance, side) {
+  const allianceSign = alliance === 'RED' ? -1 : 1;
+  
+  if (side === 'NORTH') {
+    // getStartNorthPose()
+    return applyOffsets(
+      3 * TILE_WIDTH,
+      allianceSign * -1 * TILE_WIDTH,
+      0, // heading: 0 degrees (facing +X)
+      Axial.FRONT,
+      alliance === 'RED' ? Lateral.LEFT : Lateral.RIGHT,
+      -3.25,
+      0
+    );
+  } else {
+    // getStartSouthPose()
+    return applyOffsets(
+      -3 * TILE_WIDTH,
+      allianceSign * -1 * TILE_WIDTH,
+      0, // heading: 0 degrees (facing +X)
+      Axial.BACK,
+      Lateral.LEFT,
+      1,
+      0
+    );
+  }
+}
 
 function pedroToCanvas(x, y) {
   return {
@@ -382,24 +424,68 @@ function pedroToCanvas(x, y) {
 // PATH TIMING CALCULATIONS
 // ============================================================================
 
-function calculateMoveTime(from, to) {
+function calculateMoveTime(from, to, startType = 'start', endType = 'drive', endLocale = null) {
+  // Calculate linear distance
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   
+  // Calculate turn amount
   let dHeading = to.heading - from.heading;
   while (dHeading > Math.PI) dHeading -= 2 * Math.PI;
   while (dHeading < -Math.PI) dHeading += 2 * Math.PI;
   const turnAmount = Math.abs(dHeading) * 180 / Math.PI;
   
-  const linearTime = distance / Math.sqrt(
+  // Use average of forward and lateral zero power acceleration
+  const avgAccel = (Math.abs(PEDRO_CONSTANTS.forwardZeroPowerAcceleration) + 
+                    Math.abs(PEDRO_CONSTANTS.lateralZeroPowerAcceleration)) / 2;
+  
+  // Max velocity from x and y components
+  const maxVel = Math.sqrt(
     PEDRO_CONSTANTS.xMovementVelocity ** 2 + 
     PEDRO_CONSTANTS.yMovementVelocity ** 2
   );
   
-  const turnTime = turnAmount / PEDRO_CONSTANTS.turnVelocity;
+  // Calculate linear time using trapezoidal profile
+  let linearTime;
+  const timeToMaxVel = maxVel / avgAccel;
+  const distanceToMaxVel = 0.5 * avgAccel * timeToMaxVel ** 2;
   
-  return Math.max(linearTime, turnTime);
+  if (distance < 2 * distanceToMaxVel) {
+    // Triangle profile: accelerate to peak, then decelerate
+    // d = 0.5 * a * t_accel^2 + 0.5 * a * t_decel^2
+    // Since symmetric: d = a * t^2, where t is time for half the distance
+    const halfTime = Math.sqrt(distance / (2 * avgAccel));
+    linearTime = 2 * halfTime;
+  } else {
+    // Trapezoidal profile: accel + cruise + decel
+    const cruiseDistance = distance - 2 * distanceToMaxVel;
+    const cruiseTime = cruiseDistance / maxVel;
+    linearTime = 2 * timeToMaxVel + cruiseTime;
+  }
+  
+  // Calculate turn time (assume constant angular velocity)
+  const turnTime = turnAmount / PEDRO_CONSTANTS.turnVelocity;
+
+  // Adjust times based on waypoint types/locales.
+  // Lower speed factors (e.g. approaching a deposit) increase travel time.
+  let startFactor = DRIVE_TYPE_SPEED_FACTORS[startType] || DRIVE_TYPE_SPEED_FACTORS.default;
+  let endFactor = DRIVE_TYPE_SPEED_FACTORS[endType] || DRIVE_TYPE_SPEED_FACTORS.default;
+  // If a deposit locale is provided, factor that in as well
+  if (endType === 'deposit' && endLocale) {
+    const localeFactor = DEPOSIT_LOCALE_FACTORS[endLocale] || 1.0;
+    endFactor = Math.min(endFactor, localeFactor);
+  }
+
+  // Use the more restrictive (smaller) factor to represent the limiting approach
+  const overallFactor = Math.min(startFactor, endFactor) || 1.0;
+
+  // Scale linear and turn times by inverse of the factor (slower -> longer time)
+  const adjustedLinear = linearTime / overallFactor;
+  const adjustedTurn = turnTime / overallFactor;
+
+  // Return the maximum of adjusted linear and turn time
+  return Math.max(adjustedLinear, adjustedTurn);
 }
 
 function calculatePathSegments() {
@@ -411,10 +497,12 @@ function calculatePathSegments() {
   
   const segments = [];
   let currentPose = { ...startPos };
+  let currentType = 'start';
   let cumulativeTime = 0;
   
   currentPath.forEach((wp, idx) => {
-    const moveTime = calculateMoveTime(currentPose, wp);
+    // Pass the start and end waypoint types (and deposit locale if present)
+    const moveTime = calculateMoveTime(currentPose, wp, currentType, wp.type, wp.depositLocale || null);
     segments.push({
       startPose: { ...currentPose },
       endPose: { x: wp.x, y: wp.y, heading: wp.heading },
@@ -450,6 +538,7 @@ function calculatePathSegments() {
     }
     
     currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
+    currentType = wp.type || 'drive';
   });
   
   pathSegments = segments;
@@ -466,10 +555,11 @@ function calculatePartnerPathSegments() {
   
   const segments = [];
   let currentPose = { ...partnerStartPos };
+  let currentType = 'start';
   let cumulativeTime = 0;
   
   partnerPath.forEach((wp, idx) => {
-    const moveTime = calculateMoveTime(currentPose, wp);
+    const moveTime = calculateMoveTime(currentPose, wp, currentType, wp.type, wp.depositLocale || null);
     segments.push({
       startPose: { ...currentPose },
       endPose: { x: wp.x, y: wp.y, heading: wp.heading },
@@ -505,6 +595,7 @@ function calculatePartnerPathSegments() {
     }
     
     currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
+    currentType = wp.type || 'drive';
   });
   
   partnerPathSegments = segments;
@@ -714,6 +805,7 @@ function extractPathFromBlocks(startBlockType = 'start') {
         y: y,
         heading: pose.heading,
         type: 'deposit',
+        depositLocale: locale,
         label: `Deposit ${locale}${txo || tyo ? ` (${txo},${tyo})` : ''}`
       };
     }
@@ -851,6 +943,7 @@ function updateWaypointsList() {
   let html = '';
   let cumulativeTime = 0;
   let currentPose = { ...startPos };
+  let currentType = 'start';
   
   currentPath.forEach((wp, idx) => {
     let icon = '';
@@ -858,7 +951,7 @@ function updateWaypointsList() {
     else if (wp.type === 'intake') icon = '📥';
     else if (wp.type === 'action') icon = '⚡';
     
-    const moveTime = calculateMoveTime(currentPose, wp);
+    const moveTime = calculateMoveTime(currentPose, wp, currentType, wp.type, wp.depositLocale || null);
     cumulativeTime += moveTime;
     
     let actionTime = 0;
@@ -871,6 +964,7 @@ function updateWaypointsList() {
     html += `<div class="waypoint-item">${idx + 1}. ${icon} ${wp.label} @ ${cumulativeTime.toFixed(1)}s</div>`;
     
     currentPose = { x: wp.x, y: wp.y, heading: wp.heading };
+    currentType = wp.type || 'drive';
   });
   
   list.innerHTML = html;
